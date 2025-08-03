@@ -3,26 +3,11 @@
 """
 
 import asyncio
-from datetime import datetime
 from typing import Optional
 from playwright.async_api import async_playwright, Browser, Page
 from loguru import logger
-from pydantic import BaseModel
 
-
-class LoginCredentials(BaseModel):
-    """登入憑證資料模型"""
-    company_id: str  # 公司代號
-    user_id: str     # 帳號
-    password: str    # 密碼
-
-
-class PunchClockResult(BaseModel):
-    """打卡結果資料模型"""
-    success: bool
-    timestamp: datetime
-    message: str
-    punch_type: str  # "clock_in" 或 "clock_out"
+from models import LoginCredentials, PunchClockResult
 
 
 class AoaCloudPunchClock:

@@ -5,32 +5,10 @@
 import os
 from pathlib import Path
 from typing import Optional
-from pydantic import BaseModel
 from dotenv import load_dotenv
 import json
 
-
-class LoginConfig(BaseModel):
-    """登入設定"""
-    company_id: str
-    user_id: str
-    password: str
-
-
-class ScheduleConfig(BaseModel):
-    """排程設定"""
-    clock_in_time: str = "09:00"
-    clock_out_time: str = "18:00"
-    enabled: bool = True
-    weekdays_only: bool = True
-
-
-class AppConfig(BaseModel):
-    """應用程式設定"""
-    login: LoginConfig
-    schedule: ScheduleConfig
-    debug: bool = False
-    headless: bool = True
+from models import LoginCredentials, ScheduleConfig, AppConfig
 
 
 class ConfigManager:
@@ -69,7 +47,6 @@ class ConfigManager:
     
     def get_login_credentials(self):
         """取得登入憑證"""
-        from punch_clock import LoginCredentials
         config = self.load_config()
         return LoginCredentials(
             company_id=config.login.company_id,

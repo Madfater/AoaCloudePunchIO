@@ -1,0 +1,15 @@
+{
+  "login": {
+    "company_id": "YOUR_COMPANY_ID",
+    "user_id": "YOUR_USER_ID",
+    "password": "YOUR_PASSWORD"
+  },
+  "schedule": {
+    "clock_in_time": "09:00",
+    "clock_out_time": "18:00",
+    "enabled": true,
+    "weekdays_only": true
+  },
+  "debug": false,
+  "headless": true
+}

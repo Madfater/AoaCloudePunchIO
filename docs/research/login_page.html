@@ -1,0 +1,84 @@
+<!DOCTYPE html><html lang="en" dir="ltr"><head>
+    <script data-ionic="inject">
+    (function(w){var i=w.Ionic=w.Ionic||{};i.version='3.9.2';i.angular='5.2.11';i.staticDir='build/';})(window);
+    </script>
+    <meta charset="UTF-8">
+    <title>震旦雲</title>
+    <meta name="viewport" content="viewport-fit=cover, width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="format-detection" content="telephone=no">
+    <meta name="msapplication-tap-highlight" content="no">
+
+    <link rel="icon" type="image/x-icon" href="/assets/icon/favicon.ico">
+
+    
+
+
+    <!-- un-comment this code to enable service worker
+    <script>
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('service-worker.js')
+          .then(() => console.log('service worker installed'))
+          .catch(err => console.error('Error', err));
+      }
+    </script>-->
+
+    <link href="/assets/css/AdminLTE.min.css" rel="stylesheet">
+    <link href="/assets/css/angular-calendar.css" rel="stylesheet">
+    <link href="/build/main.css?update=1.0.0.304" rel="stylesheet">
+
+</head>
+<body>
+
+    <!-- Ionic's root component and where the app will load -->
+    
+
+
+
+<ion-app class="app-root app-root-ios ios platform-core enable-hover" ng-version="5.2.11"><div app-viewport=""></div><ng-component class="app-root">
+<ion-nav swipebackenabled="false"><div nav-viewport=""></div><page-login class="ion-page show-page" style="z-index: 100;"><ion-content class="content content-ios" style=""><div class="fixed-content"></div><div class="scroll-content">
+  <ion-item class="item item-block item-ios item-select input-has-value item-input-has-value" no-lines="" style="text-align: right ;"><div class="item-inner"><div class="input-wrapper"><ion-label class="notnull label label-ios" id="lbl-0"><img src="assets/img/earth.svg" style="width: 30px;"></ion-label><!----><ion-select interface="action-sheet" class="select select-ios ng-untouched ng-pristine ng-valid"><!----><!----><div class="select-text">繁體中文</div><div class="select-icon"><div class="select-icon-inner"></div></div><button aria-haspopup="true" class="item-cover item-cover-ios item-cover-default item-cover-default-ios" ion-button="item-cover" type="button" id="select-0-0" aria-labelledby="lbl-0" aria-disabled="false"><span class="button-inner"></span><div class="button-effect"></div></button></ion-select></div><!----></div><div class="button-effect"></div></ion-item>
+    <div class="hold-transition">
+        <div class="login-box">
+            <div class="login-logo">
+                <img src="assets/img/logo.png">
+                <br>
+                <b>震旦HR系統</b>
+            </div>
+            <div class="login-box-body">
+                <div></div>
+                <p class="login-box-msg">Sign in to start your session</p>
+                <ion-list class="list list-ios">
+                    <ion-item class="item item-block item-ios item-input ng-untouched ng-pristine ng-valid"><div class="item-inner"><div class="input-wrapper"><!----><ion-input name="CompId" type="text" class="input input-ios ng-untouched ng-pristine ng-valid"><!----><input class="text-input text-input-ios" dir="auto" type="text" aria-labelledby="lbl-1" autocomplete="off" autocorrect="off" placeholder="公司代號" name="CompId" style=""><!----><!----><!----></ion-input></div><!----></div><div class="button-effect"></div></ion-item>
+                    <ion-item class="item item-block item-ios item-input ng-untouched ng-pristine ng-valid"><div class="item-inner"><div class="input-wrapper"><!----><ion-input name="UserId" type="text" class="input input-ios ng-untouched ng-pristine ng-valid"><!----><input class="text-input text-input-ios" dir="auto" type="text" aria-labelledby="lbl-2" autocomplete="off" autocorrect="off" placeholder="帳號" name="UserId" style=""><!----><!----><!----></ion-input></div><!----></div><div class="button-effect"></div></ion-item>
+                    <ion-item class="item item-block item-ios item-input ng-untouched ng-pristine ng-valid"><div class="item-inner"><div class="input-wrapper"><!----><ion-input name="Passwd" type="password" class="input input-ios ng-untouched ng-pristine ng-valid"><!----><input class="text-input text-input-ios" dir="auto" type="password" aria-labelledby="lbl-3" autocomplete="off" autocorrect="off" placeholder="密碼" name="Passwd" style=""><!----><!----><!----></ion-input></div><!----></div><div class="button-effect"></div></ion-item>
+                </ion-list>
+                <div text-center="">
+                  <button color="sky" ion-button="" class="button button-ios button-default button-default-ios button-ios-sky" style="touch-action: pan-y; user-select: none; -webkit-user-drag: none; -webkit-tap-highlight-color: rgba(0, 0, 0, 0);"><span class="button-inner">登入</span><div class="button-effect"></div></button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div></ion-content>
+</page-login><div class="nav-decor"></div></ion-nav>
+</ng-component><div overlay-portal=""></div><div overlay-portal=""></div><div class="loading-portal" overlay-portal=""></div><div class="toast-portal"></div><div class="click-block click-block-enabled"></div></ion-app>
+
+    <!-- google -->
+    <script src="https://maps.google.com/maps/api/js?key=AIzaSyAhXWZNr2Rt0pbfjfSGLpVwNgIWu7KkMs4"></script>
+
+    <!-- Line Liff SDK-->
+    
+    <script src="/Scripts/LIFFsdk-2.22.3.js?update=1.0.0.235"></script>
+
+    <!-- The polyfills js is generated during the build process -->
+    <script src="/build/polyfills.js?update=1.0.0.237"></script>
+
+    <!-- The vendor js is generated during the build process
+         It contains all of the dependencies in node_modules -->
+    <script src="/build/vendor.js?update=1.0.0.303"></script>
+
+    <!-- The main bundle js is generated during the build process -->
+    <script src="/build/main.js?update=1.0.0.304"></script>
+
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'96977a9b4b994a00',t:'MTc1NDI0MTU1NS4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><iframe height="1" width="1" style="position: absolute; top: 0px; left: 0px; border: none; visibility: hidden;"></iframe>
+
+</body></html>

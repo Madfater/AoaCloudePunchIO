@@ -107,7 +107,8 @@ src/                    # 核心源碼
 ├── __init__.py         # 模組初始化
 ├── punch_clock.py      # 自動化登入和打卡邏輯
 ├── config.py          # 配置管理系統
-├── models.py          # 資料模型定義
+├── models.py          # 資料模型定義（包含視覺化測試模型）
+├── visual_test.py     # 視覺化測試核心模組
 └── scheduler.py       # 排程管理（待開發）
 
 docs/
@@ -119,8 +120,8 @@ docs/
     └── login_page_analysis.png # 頁面截圖
 
 config.json            # 實際配置檔案（基於 config.example.json）
-main.py               # 主程式入口點
-main_enhanced.py      # 增強版主程式（包含額外功能）
+main.py               # 純粹的主程式入口點（僅基本登入測試）
+main_visual.py        # 專門的視覺化測試工具
 ```
 
 #### 開發原則
@@ -138,9 +139,15 @@ main_enhanced.py      # 增強版主程式（包含額外功能）
   - 登入按鈕: `button:has-text("登入")`
 
 #### 測試和驗證
-- 使用 `main.py` 進行登入功能測試
+**基本測試**:
+- 使用 `uv run python main.py` 進行基本登入功能測試
 - 確保 `config.json` 配置正確（基於 `config.example.json`）
 - 測試前務必確認網站結構未變更
+
+**視覺化測試**:
+- 使用 `uv run python main_visual.py --show-browser` 觀看自動化過程
+- 使用 `uv run python main_visual.py --interactive` 進行互動式測試
+- 使用 `uv run python main_visual.py --output-html report.html` 生成測試報告
 
 #### 部署考量
 - 支援 Docker 容器化部署
@@ -155,6 +162,11 @@ main_enhanced.py      # 增強版主程式（包含額外功能）
 - ✅ 配置檔案管理系統 (config.json)
 - ✅ 資料模型定義 (Pydantic)
 - ✅ 網站結構分析和元素識別
+- ✅ 完整的視覺化測試系統
+- ✅ 自動截圖和錯誤診斷功能
+- ✅ HTML測試報告生成
+- ✅ 互動式測試模式
+- ✅ 主程式與測試工具分離架構
 
 **開發中功能**:
 - ⏳ 實際打卡操作邏輯
@@ -167,8 +179,36 @@ main_enhanced.py      # 增強版主程式（包含額外功能）
 - ❌ 完整的部署文檔
 
 #### 主要檔案功能說明
-- **src/punch_clock.py**: 包含 `PunchClockAutomation` 類別，實現網站自動化邏輯
+- **src/punch_clock.py**: 包含 `AoaCloudPunchClock` 類別，實現網站自動化邏輯和截圖功能
 - **src/config.py**: 使用 Pydantic 進行配置驗證和管理
-- **src/models.py**: 定義專案相關的資料模型
-- **main.py**: 基本的功能測試入口
-- **main_enhanced.py**: 包含增強功能的主程式版本
+- **src/models.py**: 定義專案相關的資料模型，包含視覺化測試模型
+- **src/visual_test.py**: 視覺化測試執行器，支援截圖、報告生成、互動模式
+- **main.py**: 純粹的主程式入口（僅基本登入測試）
+- **main_visual.py**: 專門的視覺化測試工具，提供完整的測試功能
+
+#### 程式分離架構設計
+**關注點分離**:
+- `main.py`: 專注核心自動打卡功能，保持簡潔
+- `main_visual.py`: 專注測試和診斷功能，提供豐富的視覺化選項
+
+**命令使用方式**:
+```bash
+# 生產使用 - 基本自動打卡
+uv run python main.py
+
+# 開發測試 - 視覺化測試工具
+uv run python main_visual.py --show-browser --interactive --output-html report.html
+```
+
+## Memories
+
+### Project Memories
+- Learned the importance of separating configuration from code in the Aoacloud Punch IO project
+- Successfully implemented web automation using Playwright for HR system login
+- Developed a robust configuration management system using Pydantic
+- **2025-08-04**: 成功實現完整的視覺化測試系統
+  - 實現了主程式與測試工具的分離架構
+  - 添加了自動截圖和錯誤診斷功能
+  - 建立了HTML測試報告生成系統
+  - 修正了UV環境配置和模組導入問題
+  - 確保了Playwright瀏覽器環境的正確安裝

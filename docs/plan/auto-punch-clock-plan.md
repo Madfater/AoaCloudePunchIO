@@ -25,10 +25,12 @@
 
 ### 第二階段：核心功能開發 ⏳
 - [✅] 實現基本的網頁自動化邏輯 (登入功能)
-- [✅] 建立 PunchClockAutomation 主要類別
+- [✅] 建立 AoaCloudPunchClock 主要類別
 - [⏳] 實現完整打卡功能邏輯 (上班/下班打卡)
 - [✅] 建立配置管理系統 (config.py)
 - [✅] 建立資料模型系統 (models.py)
+- [✅] 實現視覺化測試系統 (visual_test.py)
+- [✅] 建立主程式與測試工具分離架構
 - [⏳] 實現排程系統 (APScheduler)
 - [⏳] 增強錯誤處理和重試機制
 
@@ -39,6 +41,9 @@
 - [ ] 建立部署文檔和使用說明
 
 ### 第四階段：測試和優化
+- [✅] 視覺化測試系統開發
+- [✅] 自動截圖和錯誤診斷功能
+- [✅] HTML測試報告生成
 - [ ] 功能測試和錯誤處理
 - [ ] 性能優化和穩定性測試
 - [ ] 文檔完善和使用指南
@@ -79,10 +84,14 @@
 - [✅] 依賴安裝
 
 ### 開發階段 ⏳
-- [✅] 登入邏輯實現 (PunchClockAutomation.login)
+- [✅] 登入邏輯實現 (AoaCloudPunchClock.login)
 - [✅] 基礎自動化框架建立
-- [✅] 配置系統完成 (Config類別)
-- [✅] 資料模型定義 (models.py)
+- [✅] 配置系統完成 (ConfigManager類別)
+- [✅] 資料模型定義 (models.py，包含視覺化測試模型)
+- [✅] 視覺化測試系統 (VisualTestRunner類別)
+- [✅] 自動截圖和錯誤診斷功能
+- [✅] HTML測試報告生成
+- [✅] 主程式與測試工具分離架構
 - [⏳] 打卡邏輯實現 (punch_in/punch_out方法)
 - [⏳] 排程系統 (APScheduler整合)
 - [⏳] 錯誤處理優化
@@ -93,6 +102,9 @@
 - [ ] GitHub Actions設定
 
 ### 測試部署階段
+- [✅] 視覺化測試系統實現
+- [✅] 自動截圖和錯誤診斷
+- [✅] HTML測試報告生成
 - [ ] 功能測試
 - [ ] 容器測試
 - [ ] 文檔撰寫
@@ -101,11 +113,13 @@
 **已完成的檔案：**
 - ✅ `pyproject.toml` - UV專案配置
 - ✅ `uv.lock` - 鎖定版本檔案
-- ✅ `src/punch_clock.py` - 主要打卡邏輯 (PunchClockAutomation類別)
-- ✅ `src/config.py` - 配置管理 (Config類別with Pydantic)
-- ✅ `src/models.py` - 資料模型定義
+- ✅ `src/punch_clock.py` - 主要打卡邏輯 (AoaCloudPunchClock類別)
+- ✅ `src/config.py` - 配置管理 (ConfigManager類別with Pydantic)
+- ✅ `src/models.py` - 資料模型定義（包含視覺化測試模型）
+- ✅ `src/visual_test.py` - 視覺化測試核心模組
 - ✅ `src/__init__.py` - 模組初始化
-- ✅ `main.py` - 基本主程式入口和測試功能
+- ✅ `main.py` - 純粹的主程式入口（僅基本登入測試）
+- ✅ `main_visual.py` - 專門的視覺化測試工具
 - ✅ `config.example.json` - 配置範本
 - ✅ `config.json` - 實際配置檔案
 
@@ -127,9 +141,12 @@
 /root/python/AoaCloudePunchIO/
 ├── src/                           # 源碼目錄
 │   ├── __init__.py
-│   ├── punch_clock.py             # 自動化邏輯
-│   └── config.py                  # 配置管理
-├── main.py                        # 主程式入口
+│   ├── punch_clock.py             # 自動化邏輯（含截圖功能）
+│   ├── config.py                  # 配置管理
+│   ├── models.py                  # 資料模型（含視覺化測試模型）
+│   └── visual_test.py             # 視覺化測試核心
+├── main.py                        # 純粹主程式入口
+├── main_visual.py                 # 專門視覺化測試工具
 ├── config.example.json            # 範例配置
 ├── pyproject.toml                 # 專案配置
 └── docs/plan/                     # 規劃文檔
@@ -151,7 +168,62 @@
 
 ---
 *最後更新: 2025-08-04*
-*狀態: 第一階段完成，第二階段 70% 完成 - 登入功能和核心架構已實現，打卡邏輯和排程系統開發中*
+*狀態: 第一階段完成，第二階段 85% 完成 - 登入功能、核心架構、視覺化測試系統已實現，打卡邏輯和排程系統開發中*
+
+## 最新開發進展 (2025-08-04)
+
+### ✅ 視覺化測試系統完成
+**已實現功能:**
+- 完整的截圖系統：關鍵步驟自動截圖、錯誤時診斷截圖
+- 互動式測試模式：可在每個步驟暫停觀察
+- HTML測試報告：包含截圖的可視化測試報告
+- 測試統計分析：成功率、執行時間、步驟詳情
+- 程式分離架構：主程式與測試工具完全分離
+
+**技術實現:**
+- `src/visual_test.py`: VisualTestRunner 類別
+- `main_visual.py`: 專門的測試工具入口
+- 支援多種輸出格式：JSON、HTML
+- 完整的命令行參數系統
+
+**修正問題:**
+- UV 環境配置和依賴同步
+- Playwright 瀏覽器和系統依賴安裝
+- 模組導入路徑修正
+- HTML 模板格式化問題修正
+
+## 專案結構設計原則
+### 🎯 程式分離架構
+**主程式與測試分離**：
+- `main.py`：純粹的自動打卡主程式
+  - 僅包含基本登入測試
+  - 保持簡潔，專注核心功能
+  - 生產環境使用的入口點
+  
+- `main_visual.py`：專門的視覺化測試工具
+  - 完整的視覺化測試功能
+  - 截圖、報告生成、互動模式
+  - 開發和除錯時使用
+
+### ✅ 視覺化測試功能（已完成）
+- **截圖功能**: 關鍵步驟自動截圖，錯誤時自動截圖
+- **互動模式**: 可在步驟間暫停等待用戶確認
+- **測試報告**: 生成包含截圖的HTML視覺化報告
+- **測試統計**: 成功率、執行時間、步驟詳情等
+
+### 📋 使用方式
+```bash
+# 主程式 - 基本自動打卡
+uv run python main.py
+
+# 視覺化測試工具
+uv run python main_visual.py --show-browser          # 顯示瀏覽器
+uv run python main_visual.py --interactive           # 互動模式
+uv run python main_visual.py --output-html report.html  # 生成HTML報告
+
+# 完整功能組合
+uv run python main_visual.py --show-browser --interactive --output-html report.html --log-level DEBUG
+```
 
 ## 近期開發重點
 1. **完成打卡邏輯**: 實現上班/下班打卡的具體操作流程

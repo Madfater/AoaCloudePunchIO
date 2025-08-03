@@ -8,7 +8,7 @@ from typing import Optional
 from dotenv import load_dotenv
 import json
 
-from models import LoginCredentials, ScheduleConfig, AppConfig
+from .models import LoginCredentials, ScheduleConfig, AppConfig
 
 
 class ConfigManager:

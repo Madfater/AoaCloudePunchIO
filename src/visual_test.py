@@ -76,13 +76,27 @@ class VisualTestRunner:
             logger.info("測試被使用者中斷")
             raise
     
+    def _update_screenshots(self, screenshots: List[Path]) -> None:
+        """更新截圖列表"""
+        current_screenshot_paths = {s.path for s in self.current_test.screenshots}
+        
+        for screenshot_path in screenshots:
+            if screenshot_path not in current_screenshot_paths:
+                screenshot_info = ScreenshotInfo(
+                    path=screenshot_path,
+                    step_name="auto_screenshot",
+                    description=f"自動截圖: {screenshot_path.name}",
+                    timestamp=datetime.now()
+                )
+                self.current_test.screenshots.append(screenshot_info)
+    
     async def run_login_test(self, credentials: LoginCredentials) -> VisualTestResult:
         """執行登入視覺化測試"""
-        self.current_test = self._create_test_result("Login Test")
+        self.current_test = self._create_test_result("Complete Punch Clock Test")
         
         try:
-            logger.info("🚀 開始執行登入視覺化測試")
-            await self._wait_for_user_input("準備開始登入測試")
+            logger.info("🚀 開始執行完整打卡系統視覺化測試")
+            await self._wait_for_user_input("準備開始完整測試流程")
             
             # 創建打卡系統實例，啟用截圖功能
             async with AoaCloudPunchClock(
@@ -97,34 +111,108 @@ class VisualTestRunner:
                     True
                 )
                 
+                # 立即記錄初始截圖
+                screenshots = punch_clock.get_screenshots_taken()
+                self._update_screenshots(screenshots)
+                
                 await self._wait_for_user_input("瀏覽器已初始化，準備執行登入")
                 
-                # 執行登入測試
+                # 步驟1: 執行登入測試
                 login_success = await punch_clock.login(credentials)
                 
-                # 獲取截圖列表
+                # 記錄登入結果和截圖
                 screenshots = punch_clock.get_screenshots_taken()
+                self._update_screenshots(screenshots)
                 
-                # 記錄截圖資訊
-                for screenshot_path in screenshots:
-                    screenshot_info = ScreenshotInfo(
-                        path=screenshot_path,
-                        step_name="auto_screenshot",
-                        description=f"自動截圖: {screenshot_path.name}",
-                        timestamp=datetime.now()
-                    )
-                    self.current_test.screenshots.append(screenshot_info)
-                
-                # 記錄登入結果
                 self._add_test_step(
                     "login_attempt",
                     "執行登入操作",
                     login_success,
-                    screenshots[-1] if screenshots else None,
-                    None if login_success else "登入失敗"
+                    error_message=None if login_success else "登入失敗"
                 )
                 
-                await self._wait_for_user_input("登入測試完成，查看結果")
+                if not login_success:
+                    logger.error("登入失敗，無法繼續測試打卡功能")
+                    return self.current_test
+                
+                await self._wait_for_user_input("登入成功，準備導航到打卡頁面")
+                
+                # 步驟2: 導航到打卡頁面
+                navigation_success = await punch_clock.navigate_to_punch_page()
+                
+                # 記錄導航截圖
+                screenshots = punch_clock.get_screenshots_taken()
+                self._update_screenshots(screenshots)
+                
+                self._add_test_step(
+                    "navigate_to_punch",
+                    "導航到出勤打卡頁面",
+                    navigation_success,
+                    error_message=None if navigation_success else "導航失敗"
+                )
+                
+                if not navigation_success:
+                    logger.error("導航到打卡頁面失敗")
+                    return self.current_test
+                
+                await self._wait_for_user_input("已到達打卡頁面，準備檢查頁面狀態")
+                
+                # 步驟3: 檢查打卡頁面狀態
+                page_status = await punch_clock.check_punch_page_status()
+                
+                # 記錄狀態檢查截圖
+                screenshots = punch_clock.get_screenshots_taken()
+                self._update_screenshots(screenshots)
+                
+                # 修改成功條件：只要有簽到或簽退按鈕可用就算成功
+                status_success = (page_status.get("sign_in_available", False) or 
+                                page_status.get("sign_out_available", False)) and not page_status.get("error")
+                
+                self._add_test_step(
+                    "check_page_status",
+                    "檢查打卡頁面狀態",
+                    status_success,
+                    error_message=page_status.get("error") if page_status.get("error") else 
+                                 ("打卡按鈕不可用" if not status_success else None)
+                )
+                
+                if not status_success:
+                    logger.error("打卡頁面狀態檢查失敗")
+                    return self.current_test
+                
+                await self._wait_for_user_input("頁面狀態檢查完成，準備模擬簽到")
+                
+                # 步驟4: 模擬簽到操作
+                sign_in_success = await punch_clock.simulate_punch_action("sign_in")
+                
+                # 記錄簽到截圖
+                screenshots = punch_clock.get_screenshots_taken()
+                self._update_screenshots(screenshots)
+                
+                self._add_test_step(
+                    "simulate_sign_in",
+                    "模擬簽到操作",
+                    sign_in_success,
+                    error_message=None if sign_in_success else "簽到模擬失敗"
+                )
+                
+                await self._wait_for_user_input("簽到模擬完成，準備模擬簽退")
+                
+                # 步驟5: 模擬簽退操作
+                sign_out_success = await punch_clock.simulate_punch_action("sign_out")
+                
+                # 記錄簽退截圖
+                screenshots = punch_clock.get_screenshots_taken()
+                self._update_screenshots(screenshots)
+                
+                self._add_test_step(
+                    "simulate_sign_out",
+                    "模擬簽退操作",
+                    sign_out_success,
+                    error_message=None if sign_out_success else "簽退模擬失敗"
+                )
+                
+                await self._wait_for_user_input("完整測試流程完成，查看結果")
                 
         except Exception as e:
             error_msg = f"測試執行異常: {str(e)}"

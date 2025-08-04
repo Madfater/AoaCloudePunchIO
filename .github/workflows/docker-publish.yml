@@ -144,7 +144,7 @@ jobs:
         output: 'trivy-results.sarif'
     
     - name: 上傳 Trivy 掃描結果到 GitHub Security
-      uses: github/codeql-action/upload-sarif@v2
+      uses: github/codeql-action/upload-sarif@v3
       if: always()
       with:
         sarif_file: 'trivy-results.sarif'

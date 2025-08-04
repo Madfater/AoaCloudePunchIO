@@ -223,7 +223,7 @@ class SchedulerManager:
     
     def __init__(self):
         if self._scheduler is None:
-            from .config import config_manager
+            from src.config import config_manager
             self._scheduler = PunchScheduler(config_manager)
     
     @property

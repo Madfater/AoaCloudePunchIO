@@ -119,13 +119,13 @@ docs/
     ├── login_page.html       # 登入頁面HTML快照
     └── login_page_analysis.png # 頁面截圖
 
-config.json            # 實際配置檔案（基於 config.example.json）
+.env                   # 實際環境變數設定檔（基於 .env.example）
 main.py               # 純粹的主程式入口點（僅基本登入測試）
 main_visual.py        # 專門的視覺化測試工具
 ```
 
 #### 開發原則
-1. **安全優先**: 不在代碼中硬編碼憑證，使用配置檔案或環境變數
+1. **安全優先**: 不在代碼中硬編碼憑證，使用環境變數進行配置
 2. **錯誤處理**: 實現重試機制和詳細的錯誤日誌
 3. **資源管理**: 使用異步上下文管理器確保瀏覽器資源正確清理
 4. **配置分離**: 支援開發、測試、生產環境的不同配置
@@ -138,10 +138,30 @@ main_visual.py        # 專門的視覺化測試工具
   - 密碼: `input[name="Passwd"]`
   - 登入按鈕: `button:has-text("登入")`
 
+#### 設定和配置
+**環境變數設定**:
+- 複製 `.env.example` 為 `.env`: `cp .env.example .env`
+- 修改 `.env` 文件中的必要設定值（COMPANY_ID, USER_ID, PASSWORD）
+- 所有敏感資料都使用環境變數，不會被提交到版本控制
+
+**必要環境變數**:
+- `COMPANY_ID`: 震旦HR系統公司代號
+- `USER_ID`: 使用者帳號
+- `PASSWORD`: 登入密碼
+
+**可選環境變數**（有預設值）:
+- `CLOCK_IN_TIME`: 上班打卡時間（預設: 09:00）
+- `CLOCK_OUT_TIME`: 下班打卡時間（預設: 18:00）
+- `SCHEDULE_ENABLED`: 是否啟用排程（預設: true）
+- `WEEKDAYS_ONLY`: 僅工作日執行（預設: true）
+- `GPS_LATITUDE`, `GPS_LONGITUDE`, `GPS_ADDRESS`: GPS 定位設定
+- `DEBUG`: 除錯模式（預設: false）
+- `HEADLESS`: 無頭瀏覽器模式（預設: true）
+
 #### 測試和驗證
 **基本測試**:
 - 使用 `uv run python main.py` 進行基本登入功能測試
-- 確保 `config.json` 配置正確（基於 `config.example.json`）
+- 確保 `.env` 配置正確（基於 `.env.example`）
 - 測試前務必確認網站結構未變更
 
 **視覺化測試**:
@@ -159,7 +179,7 @@ main_visual.py        # 專門的視覺化測試工具
 - ✅ 基礎專案架構和配置管理
 - ✅ 震旦HR系統登入自動化
 - ✅ 使用 Playwright 的穩定網頁自動化
-- ✅ 配置檔案管理系統 (config.json)
+- ✅ 環境變數配置管理系統 (.env)
 - ✅ 資料模型定義 (Pydantic)
 - ✅ 網站結構分析和元素識別
 - ✅ 完整的視覺化測試系統
@@ -180,7 +200,7 @@ main_visual.py        # 專門的視覺化測試工具
 
 #### 主要檔案功能說明
 - **src/punch_clock.py**: 包含 `AoaCloudPunchClock` 類別，實現網站自動化邏輯和截圖功能
-- **src/config.py**: 使用 Pydantic 進行配置驗證和管理
+- **src/config.py**: 使用 Pydantic 和環境變數進行配置驗證和管理
 - **src/models.py**: 定義專案相關的資料模型，包含視覺化測試模型
 - **src/visual_test.py**: 視覺化測試執行器，支援截圖、報告生成、互動模式
 - **main.py**: 純粹的主程式入口（僅基本登入測試）
@@ -212,3 +232,4 @@ uv run python main_visual.py --show-browser --interactive --output-html report.h
   - 建立了HTML測試報告生成系統
   - 修正了UV環境配置和模組導入問題
   - 確保了Playwright瀏覽器環境的正確安裝
+  - 重構配置系統改為使用 .env 環境變數管理，提升安全性和部署便利性

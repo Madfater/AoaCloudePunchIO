@@ -3,3 +3,8 @@ __pycache__
 .mcp.json
 config.json
 /screenshots
+
+# 環境變數檔案
+.env
+.env.local
+.env.*.local

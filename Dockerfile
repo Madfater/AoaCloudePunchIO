@@ -12,8 +12,9 @@ RUN apt-get update && apt-get install -y \
     build-essential \
     && rm -rf /var/lib/apt/lists/*
 
-# 安裝 UV (最新版本)
-RUN pip install uv
+# 安裝 UV (使用官方安裝腳本)
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh
+ENV PATH="/root/.local/bin:$PATH"
 
 # 設定工作目錄
 WORKDIR /app
@@ -33,14 +34,17 @@ FROM python:3.11-slim AS runtime
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     UV_CACHE_DIR=/tmp/uv-cache \
-    PATH="/app/.venv/bin:$PATH"
+    PATH="/app/.venv/bin:$PATH" \
+    UV_NO_CACHE=1
 
 # 安裝系統依賴和 Playwright 瀏覽器依賴
 RUN apt-get update && apt-get install -y \
-    # Playwright 瀏覽器依賴
+    # 基本工具
+    curl \
     wget \
     gnupg \
     ca-certificates \
+    # Playwright 瀏覽器依賴
     fonts-liberation \
     libasound2 \
     libatk-bridge2.0-0 \
@@ -91,24 +95,32 @@ RUN groupadd --gid 1000 appuser && \
 # 設定工作目錄
 WORKDIR /app
 
-# 從建構階段複製虛擬環境
-COPY --from=builder /app/.venv /app/.venv
-
 # 安裝 UV（執行階段也需要）
-RUN pip install uv
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh
+ENV PATH="/root/.local/bin:$PATH"
 
 # 複製應用程式代碼
 COPY --chown=appuser:appuser . .
 
+# 從建構階段複製虛擬環境並設定正確的擁有者
+COPY --from=builder --chown=appuser:appuser /app/.venv /app/.venv
+
+# 安裝 Playwright 系統依賴（作為 root）
+RUN /root/.local/bin/uv run playwright install-deps chromium
+
+# 建立必要的目錄並設定權限
+RUN mkdir -p /app/screenshots /app/logs && \
+    chown -R appuser:appuser /app
+
 # 切換到非 root 使用者
 USER appuser
 
-# 安裝 Playwright 瀏覽器（作為 appuser）
-RUN uv run playwright install chromium
-RUN uv run playwright install-deps chromium
+# 為 appuser 安裝 UV
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh
+ENV PATH="/home/appuser/.local/bin:$PATH"
 
-# 建立必要的目錄
-RUN mkdir -p /app/screenshots /app/logs
+# 作為 appuser 安裝 Playwright 瀏覽器
+RUN uv run playwright install chromium
 
 # 健康檢查
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
@@ -131,7 +143,7 @@ LABEL maintainer="震旦HR自動打卡系統" \
 
 # 建構指令範例:
 # docker build -t aoacloud-punch:latest .
-# docker run -d --name punch-scheduler -v $(pwd)/config.json:/app/config.json aoacloud-punch:latest
+# docker run -d --name punch-scheduler --env-file .env aoacloud-punch:latest
 
 # 開發模式:
 # docker run -it --rm -v $(pwd):/app aoacloud-punch:latest bash

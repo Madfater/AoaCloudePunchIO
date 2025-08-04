@@ -9,16 +9,17 @@ from typing import Optional, List, Callable, Any
 from playwright.async_api import async_playwright, Browser, Page
 from loguru import logger
 
-from .models import LoginCredentials
+from .models import LoginCredentials, PunchAction, PunchResult, GPSConfig
 
 
 class AoaCloudPunchClock:
     """震旦HR系統自動打卡類別"""
     
-    def __init__(self, headless: bool = True, enable_screenshots: bool = False, screenshots_dir: str = "screenshots"):
+    def __init__(self, headless: bool = True, enable_screenshots: bool = False, screenshots_dir: str = "screenshots", gps_config: Optional[GPSConfig] = None):
         self.headless = headless
         self.enable_screenshots = enable_screenshots
         self.screenshots_dir = Path(screenshots_dir)
+        self.gps_config = gps_config or GPSConfig()  # 使用傳入的GPS配置或預設值
         self.browser: Optional[Browser] = None
         self.page: Optional[Page] = None
         self._base_url = "https://erpline.aoacloud.com.tw"
@@ -59,7 +60,10 @@ class AoaCloudPunchClock:
             # 創建新的context以便設置權限
             context = await self.browser.new_context(
                 permissions=['geolocation'],  # 授予地理位置權限
-                geolocation={'latitude': 25.0330, 'longitude': 121.5654}  # 台北市座標作為預設位置
+                geolocation={
+                    'latitude': self.gps_config.latitude, 
+                    'longitude': self.gps_config.longitude
+                }  # 使用配置檔案的GPS座標
             )
             
             self.page = await context.new_page()
@@ -528,3 +532,341 @@ class AoaCloudPunchClock:
             logger.error(f"檢查打卡頁面狀態失敗: {e}")
             await self._take_error_screenshot(f"狀態檢查失敗: {str(e)}")
             return {"error": str(e)}
+
+    async def execute_real_punch_action(self, action: PunchAction, confirm: bool = False) -> PunchResult:
+        """執行真實的打卡動作（實際點擊按鈕）
+        
+        Args:
+            action: 打卡動作類型 (PunchAction.SIGN_IN 或 PunchAction.SIGN_OUT)
+            confirm: 是否確認執行實際操作，預設為False以防誤操作
+        
+        Returns:
+            PunchResult: 打卡操作結果
+        """
+        start_time = datetime.now()
+        
+        # 如果沒有確認，則執行模擬模式
+        if not confirm:
+            logger.warning("⚠️ 未確認實際操作，轉為模擬模式")
+            simulate_success = await self.simulate_punch_action(action.value)
+            return PunchResult(
+                success=simulate_success,
+                action=action,
+                timestamp=start_time,
+                message="模擬模式執行，未實際點擊按鈕",
+                is_simulation=True
+            )
+        
+        try:
+            if action == PunchAction.SIGN_IN:
+                button_text = "簽到"
+                action_name = "簽到"
+            elif action == PunchAction.SIGN_OUT:
+                button_text = "簽退"
+                action_name = "簽退"
+            else:
+                return PunchResult(
+                    success=False,
+                    action=action,
+                    timestamp=start_time,
+                    message=f"不支援的打卡動作: {action}",
+                    is_simulation=False
+                )
+            
+            logger.info(f"🎯 準備執行真實 {action_name} 操作...")
+            
+            # 等待打卡按鈕出現
+            button_selector = f'button:has-text("{button_text}")'
+            await self.page.wait_for_selector(button_selector, timeout=10000)
+            
+            # 檢查按鈕是否存在且可見
+            button_element = await self.page.query_selector(button_selector)
+            if not button_element:
+                return PunchResult(
+                    success=False,
+                    action=action,
+                    timestamp=start_time,
+                    message=f"找不到 {action_name} 按鈕",
+                    is_simulation=False
+                )
+            
+            # 檢查按鈕狀態
+            is_visible = await button_element.is_visible()
+            is_enabled = await button_element.is_enabled()
+            
+            if not is_visible:
+                return PunchResult(
+                    success=False,
+                    action=action,
+                    timestamp=start_time,
+                    message=f"{action_name} 按鈕不可見",
+                    is_simulation=False
+                )
+            
+            if not is_enabled:
+                return PunchResult(
+                    success=False,
+                    action=action,
+                    timestamp=start_time,
+                    message=f"{action_name} 按鈕不可用",
+                    is_simulation=False
+                )
+            
+            # 執行前截圖
+            before_screenshot = await self._take_screenshot(f"before_real_{action.value}", f"準備執行真實 {action_name}")
+            
+            logger.info(f"🚀 執行真實 {action_name} 操作 - 點擊按鈕")
+            
+            # 實際點擊按鈕
+            await button_element.click()
+            
+            logger.info(f"✅ 已點擊 {action_name} 按鈕，等待系統回應...")
+            
+            # 等待系統處理
+            await asyncio.sleep(2)  # 給系統時間處理請求
+            
+            # 執行後截圖
+            after_screenshot = await self._take_screenshot(f"after_real_{action.value}", f"執行 {action_name} 後的頁面狀態")
+            
+            # 驗證打卡結果
+            verification_result = await self.verify_punch_result(action)
+            
+            return PunchResult(
+                success=verification_result["success"],
+                action=action,
+                timestamp=start_time,
+                message=verification_result["message"],
+                server_response=verification_result.get("server_response"),
+                screenshot_path=after_screenshot,
+                is_simulation=False
+            )
+            
+        except Exception as e:
+            error_screenshot = await self._take_error_screenshot(f"真實{action_name}操作失敗: {str(e)}")
+            logger.error(f"執行真實 {action_name} 操作失敗: {e}")
+            
+            return PunchResult(
+                success=False,
+                action=action,
+                timestamp=start_time,
+                message=f"執行 {action_name} 時發生錯誤: {str(e)}",
+                screenshot_path=error_screenshot,
+                is_simulation=False
+            )
+
+    async def verify_punch_result(self, action: PunchAction, timeout: int = 10000) -> dict:
+        """驗證打卡操作結果
+        
+        Args:
+            action: 執行的打卡動作
+            timeout: 等待驗證的超時時間（毫秒）
+        
+        Returns:
+            dict: 驗證結果，包含success, message, server_response等
+        """
+        try:
+            action_name = "簽到" if action == PunchAction.SIGN_IN else "簽退"
+            logger.info(f"🔍 驗證 {action_name} 操作結果...")
+            
+            # 等待可能出現的成功訊息或對話框
+            success_indicators = [
+                'text="打卡成功"',           # 成功訊息
+                'text="簽到成功"',           # 簽到成功
+                'text="簽退成功"',           # 簽退成功  
+                '.success-message',           # 成功訊息CSS類別
+                'ion-toast[color="success"]', # 成功提示框
+                '.alert-success'              # 成功警告框
+            ]
+            
+            error_indicators = [
+                'text="打卡失敗"',           # 失敗訊息
+                'text="簽到失敗"',           # 簽到失敗
+                'text="簽退失敗"',           # 簽退失敗
+                '.error-message',             # 錯誤訊息CSS類別
+                'ion-toast[color="danger"]',  # 錯誤提示框
+                '.alert-danger'               # 錯誤警告框
+            ]
+            
+            verification_result = {
+                "success": False,
+                "message": f"{action_name} 結果未知",
+                "server_response": None
+            }
+            
+            # 等待成功或失敗指示器出現
+            wait_time = timeout / 1000  # 轉換為秒
+            check_interval = 0.5
+            elapsed_time = 0
+            
+            while elapsed_time < wait_time:
+                # 檢查成功指示器
+                for indicator in success_indicators:
+                    try:
+                        element = await self.page.query_selector(indicator)
+                        if element and await element.is_visible():
+                            text_content = await element.text_content()
+                            logger.info(f"✅ 檢測到成功指示器: {text_content}")
+                            verification_result.update({
+                                "success": True,
+                                "message": f"{action_name} 成功",
+                                "server_response": text_content
+                            })
+                            return verification_result
+                    except:
+                        continue
+                
+                # 檢查失敗指示器
+                for indicator in error_indicators:
+                    try:
+                        element = await self.page.query_selector(indicator)
+                        if element and await element.is_visible():
+                            text_content = await element.text_content()
+                            logger.warning(f"❌ 檢測到失敗指示器: {text_content}")
+                            verification_result.update({
+                                "success": False,
+                                "message": f"{action_name} 失敗",
+                                "server_response": text_content
+                            })
+                            return verification_result
+                    except:
+                        continue
+                
+                # 檢查頁面是否有任何提示訊息
+                try:
+                    # 查找一般的提示訊息
+                    toast_elements = await self.page.query_selector_all('ion-toast')
+                    for toast in toast_elements:
+                        if await toast.is_visible():
+                            toast_text = await toast.text_content()
+                            if toast_text and (action_name in toast_text or "打卡" in toast_text):
+                                logger.info(f"📄 檢測到提示訊息: {toast_text}")
+                                # 根據訊息內容判斷成功或失敗
+                                if "成功" in toast_text:
+                                    verification_result.update({
+                                        "success": True,
+                                        "message": f"{action_name} 成功",
+                                        "server_response": toast_text
+                                    })
+                                elif "失敗" in toast_text or "錯誤" in toast_text:
+                                    verification_result.update({
+                                        "success": False,
+                                        "message": f"{action_name} 失敗",
+                                        "server_response": toast_text
+                                    })
+                                else:
+                                    verification_result.update({
+                                        "message": f"{action_name} 結果: {toast_text}",
+                                        "server_response": toast_text
+                                    })
+                                return verification_result
+                except:
+                    pass
+                
+                await asyncio.sleep(check_interval)
+                elapsed_time += check_interval
+            
+            # 如果沒有明確的成功/失敗指示器，嘗試通過按鈕狀態變化判斷
+            logger.info("🔄 未檢測到明確結果指示器，嘗試通過按鈕狀態判斷...")
+            
+            try:
+                current_status = await self.check_punch_page_status()
+                if action == PunchAction.SIGN_IN:
+                    # 簽到後，簽到按鈕應該變為不可用，簽退按鈕變為可用
+                    if not current_status.get('sign_in_available', True) and current_status.get('sign_out_available', False):
+                        verification_result.update({
+                            "success": True,
+                            "message": "根據按鈕狀態判斷簽到成功",
+                            "server_response": "按鈕狀態已更新"
+                        })
+                    else:
+                        verification_result.update({
+                            "success": False,
+                            "message": "根據按鈕狀態判斷簽到可能失敗",
+                            "server_response": "按鈕狀態未如預期更新"
+                        })
+                elif action == PunchAction.SIGN_OUT:
+                    # 簽退後，簽退按鈕應該變為不可用，簽到按鈕變為可用（隔天）
+                    if not current_status.get('sign_out_available', True):
+                        verification_result.update({
+                            "success": True,
+                            "message": "根據按鈕狀態判斷簽退成功",
+                            "server_response": "按鈕狀態已更新"
+                        })
+                    else:
+                        verification_result.update({
+                            "success": False,
+                            "message": "根據按鈕狀態判斷簽退可能失敗",
+                            "server_response": "按鈕狀態未如預期更新"
+                        })
+            except Exception as status_error:
+                logger.warning(f"無法檢查按鈕狀態: {status_error}")
+            
+            logger.warning(f"⚠️ {action_name} 結果驗證超時或未明確")
+            return verification_result
+            
+        except Exception as e:
+            logger.error(f"驗證 {action_name} 結果時發生錯誤: {e}")
+            return {
+                "success": False,
+                "message": f"驗證 {action_name} 結果時發生錯誤: {str(e)}",
+                "server_response": None
+            }
+
+    async def wait_for_punch_confirmation(self, action: PunchAction, timeout: int = 30000) -> bool:
+        """等待用戶確認執行真實打卡操作
+        
+        Args:
+            action: 要執行的打卡動作
+            timeout: 等待確認的超時時間（毫秒）
+        
+        Returns:
+            bool: 是否確認執行
+        """
+        try:
+            action_name = "簽到" if action == PunchAction.SIGN_IN else "簽退"
+            
+            logger.info(f"⚠️ 準備執行真實 {action_name} 操作")
+            logger.info("🔔 這將會實際點擊打卡按鈕，請確認您要執行此操作")
+            logger.info("💡 如果您只想測試功能，請使用模擬模式")
+            
+            # 在交互式模式下，詢問用戶確認
+            if hasattr(self, '_interactive_mode') and self._interactive_mode:
+                try:
+                    import sys
+                    print(f"\n⚠️  警告：即將執行真實 {action_name} 操作")
+                    print("這將會實際點擊震旦HR系統的打卡按鈕")
+                    print("如果您不想實際打卡，請選擇 'n' 或直接按 Enter 取消")
+                    
+                    response = input(f"確定要執行真實 {action_name} 嗎？ (輸入 'yes' 確認，其他任何輸入都將取消): ").strip().lower()
+                    
+                    if response == 'yes':
+                        logger.info(f"✅ 用戶確認執行真實 {action_name} 操作")
+                        return True
+                    else:
+                        logger.info(f"❌ 用戶取消真實 {action_name} 操作")
+                        return False
+                        
+                except Exception as input_error:
+                    logger.error(f"獲取用戶輸入時發生錯誤: {input_error}")
+                    return False
+            
+            # 非交互式模式下，預設不確認（安全機制）
+            logger.warning("🛡️ 非交互式模式，預設不執行真實操作以確保安全")
+            logger.info("💡 如需執行真實操作，請使用交互式模式或明確傳入 confirm=True 參數")
+            return False
+            
+        except Exception as e:
+            logger.error(f"等待用戶確認時發生錯誤: {e}")
+            return False
+
+    def set_interactive_mode(self, interactive: bool = True):
+        """設定是否為交互式模式
+        
+        Args:
+            interactive: 是否啟用交互式模式
+        """
+        self._interactive_mode = interactive
+        if interactive:
+            logger.info("🤝 已啟用交互式模式，執行真實操作前將詢問確認")
+        else:
+            logger.info("🤖 已設定為非交互式模式，預設執行模擬操作")

@@ -13,7 +13,10 @@ from .models import (
     LoginCredentials, 
     VisualTestResult, 
     TestStep, 
-    ScreenshotInfo
+    ScreenshotInfo,
+    PunchAction,
+    PunchResult,
+    GPSConfig
 )
 from .punch_clock import AoaCloudPunchClock
 
@@ -21,9 +24,10 @@ from .punch_clock import AoaCloudPunchClock
 class VisualTestRunner:
     """視覺化測試執行器"""
     
-    def __init__(self, headless: bool = False, interactive_mode: bool = False):
+    def __init__(self, headless: bool = False, interactive_mode: bool = False, gps_config: Optional[GPSConfig] = None):
         self.headless = headless
         self.interactive_mode = interactive_mode
+        self.gps_config = gps_config or GPSConfig()  # 使用傳入的GPS配置或預設值
         self.current_test: Optional[VisualTestResult] = None
         
     def _create_test_result(self, test_name: str) -> VisualTestResult:
@@ -101,7 +105,8 @@ class VisualTestRunner:
             # 創建打卡系統實例，啟用截圖功能
             async with AoaCloudPunchClock(
                 headless=self.headless, 
-                enable_screenshots=True
+                enable_screenshots=True,
+                gps_config=self.gps_config
             ) as punch_clock:
                 
                 # 記錄瀏覽器初始化步驟
@@ -420,3 +425,208 @@ class VisualTestRunner:
         except Exception as e:
             logger.error(f"生成HTML報告失敗: {e}")
             return False
+
+    async def run_real_punch_test(self, credentials: LoginCredentials, 
+                                 punch_action: Optional[PunchAction] = None) -> VisualTestResult:
+        """執行真實打卡視覺化測試
+        
+        Args:
+            credentials: 登入憑證
+            punch_action: 指定要執行的打卡動作，None表示測試所有可用動作
+        """
+        test_name = f"Real Punch Test - {punch_action.value if punch_action else 'All Actions'}"
+        self.current_test = self._create_test_result(test_name)
+        
+        try:
+            logger.info("🚀 開始執行真實打卡視覺化測試")
+            logger.warning("⚠️ 警告：這將執行真實的打卡操作！")
+            
+            await self._wait_for_user_input("準備開始真實打卡測試（將實際點擊按鈕）")
+            
+            # 創建打卡系統實例，啟用截圖功能
+            async with AoaCloudPunchClock(
+                headless=self.headless, 
+                enable_screenshots=True,
+                gps_config=self.gps_config
+            ) as punch_clock:
+                
+                # 設定交互式模式
+                punch_clock.set_interactive_mode(True)
+                
+                # 記錄瀏覽器初始化步驟
+                self._add_test_step(
+                    "browser_init", 
+                    "瀏覽器初始化",
+                    True
+                )
+                
+                # 立即記錄初始截圖
+                screenshots = punch_clock.get_screenshots_taken()
+                self._update_screenshots(screenshots)
+                
+                await self._wait_for_user_input("瀏覽器已初始化，準備執行登入")
+                
+                # 步驟1: 執行登入測試
+                login_success = await punch_clock.login(credentials)
+                
+                # 記錄登入結果和截圖
+                screenshots = punch_clock.get_screenshots_taken()
+                self._update_screenshots(screenshots)
+                
+                self._add_test_step(
+                    "login_attempt",
+                    "執行登入操作",
+                    login_success,
+                    error_message=None if login_success else "登入失敗"
+                )
+                
+                if not login_success:
+                    logger.error("登入失敗，無法繼續測試真實打卡")
+                    return self.current_test
+                
+                await self._wait_for_user_input("登入成功，準備導航到打卡頁面")
+                
+                # 步驟2: 導航到打卡頁面
+                navigation_success = await punch_clock.navigate_to_punch_page()
+                
+                # 記錄導航截圖
+                screenshots = punch_clock.get_screenshots_taken()
+                self._update_screenshots(screenshots)
+                
+                self._add_test_step(
+                    "navigate_to_punch",
+                    "導航到出勤打卡頁面",
+                    navigation_success,
+                    error_message=None if navigation_success else "導航失敗"
+                )
+                
+                if not navigation_success:
+                    logger.error("導航到打卡頁面失敗")
+                    return self.current_test
+                
+                await self._wait_for_user_input("已到達打卡頁面，準備檢查頁面狀態")
+                
+                # 步驟3: 檢查打卡頁面狀態
+                page_status = await punch_clock.check_punch_page_status()
+                
+                # 記錄狀態檢查截圖
+                screenshots = punch_clock.get_screenshots_taken()
+                self._update_screenshots(screenshots)
+                
+                # 檢查成功條件
+                status_success = (page_status.get("sign_in_available", False) or 
+                                page_status.get("sign_out_available", False)) and not page_status.get("error")
+                
+                self._add_test_step(
+                    "check_page_status",
+                    "檢查打卡頁面狀態",
+                    status_success,
+                    error_message=page_status.get("error") if page_status.get("error") else 
+                                 ("打卡按鈕不可用" if not status_success else None)
+                )
+                
+                if not status_success:
+                    logger.error("打卡頁面狀態檢查失敗")
+                    return self.current_test
+                
+                # 步驟4: 執行真實打卡操作
+                if punch_action:
+                    # 執行指定的打卡動作
+                    await self._execute_real_punch_action(punch_clock, punch_action, page_status)
+                else:
+                    # 測試所有可用的打卡動作
+                    if page_status.get('sign_in_available'):
+                        await self._execute_real_punch_action(punch_clock, PunchAction.SIGN_IN, page_status)
+                    
+                    if page_status.get('sign_out_available'):
+                        await self._execute_real_punch_action(punch_clock, PunchAction.SIGN_OUT, page_status)
+                
+                await self._wait_for_user_input("真實打卡測試完成，查看結果")
+                
+        except Exception as e:
+            error_msg = f"真實打卡測試執行異常: {str(e)}"
+            logger.error(error_msg)
+            self._add_test_step(
+                "test_error",
+                "測試執行異常",
+                False,
+                error_message=str(e)
+            )
+        
+        finally:
+            # 完成測試記錄
+            self.current_test.end_time = datetime.now()
+            self.current_test.overall_success = all(step.success for step in self.current_test.steps)
+            
+            # 顯示測試摘要
+            self._print_test_summary()
+            
+        return self.current_test
+
+    async def _execute_real_punch_action(self, punch_clock: AoaCloudPunchClock, 
+                                       action: PunchAction, page_status: dict) -> None:
+        """執行單個真實打卡動作"""
+        action_name = "簽到" if action == PunchAction.SIGN_IN else "簽退"
+        available_key = 'sign_in_available' if action == PunchAction.SIGN_IN else 'sign_out_available'
+        
+        if not page_status.get(available_key, False):
+            logger.warning(f"⚠️ {action_name} 按鈕不可用，跳過測試")
+            self._add_test_step(
+                f"skip_{action.value}",
+                f"跳過{action_name}操作（按鈕不可用）",
+                True
+            )
+            return
+        
+        await self._wait_for_user_input(f"準備執行真實{action_name}操作")
+        
+        try:
+            # 執行真實打卡操作
+            logger.info(f"🎯 準備執行真實 {action_name} 操作...")
+            
+            # 等待用戶確認
+            confirm = await punch_clock.wait_for_punch_confirmation(action)
+            result = await punch_clock.execute_real_punch_action(action, confirm=confirm)
+            
+            # 記錄操作結果和截圖
+            screenshots = punch_clock.get_screenshots_taken()
+            self._update_screenshots(screenshots)
+            
+            # 添加測試步驟記錄
+            step_name = f"real_{action.value}"
+            if result.is_simulation:
+                description = f"模擬{action_name}操作（用戶取消真實操作）"
+                success = result.success
+                error_message = None if result.success else result.message
+            else:
+                description = f"真實{action_name}操作"
+                success = result.success
+                error_message = None if result.success else result.message
+                
+                # 如果是真實操作，添加額外的成功/失敗信息
+                if result.success:
+                    logger.info(f"🎉 真實{action_name}成功執行！")
+                    if result.server_response:
+                        logger.info(f"   系統回應: {result.server_response}")
+                else:
+                    logger.error(f"❌ 真實{action_name}執行失敗")
+                    if result.server_response:
+                        logger.error(f"   系統回應: {result.server_response}")
+            
+            self._add_test_step(
+                step_name,
+                description,
+                success,
+                screenshot_path=result.screenshot_path,
+                error_message=error_message
+            )
+            
+        except Exception as e:
+            error_msg = f"執行真實{action_name}時發生異常: {str(e)}"
+            logger.error(error_msg)
+            self._add_test_step(
+                f"error_{action.value}",
+                f"真實{action_name}操作異常",
+                False,
+                error_message=str(e)
+            )

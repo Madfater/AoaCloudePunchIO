@@ -12,8 +12,8 @@ from apscheduler.triggers.cron import CronTrigger
 from apscheduler.jobstores.memory import MemoryJobStore
 from apscheduler.executors.asyncio import AsyncIOExecutor
 
-from .models import ScheduleConfig, PunchAction, PunchResult
-from .config import ConfigManager
+from src.models import ScheduleConfig, PunchAction, PunchResult
+from src.config import ConfigManager
 
 
 class PunchScheduler:

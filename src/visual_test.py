@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Optional, List
 from loguru import logger
 
-from .models import (
+from src.models import (
     LoginCredentials, 
     VisualTestResult, 
     TestStep, 
@@ -18,7 +18,7 @@ from .models import (
     PunchResult,
     GPSConfig
 )
-from .punch_clock import AoaCloudPunchClock
+from src.punch_clock import AoaCloudPunchClock
 
 
 class VisualTestRunner:

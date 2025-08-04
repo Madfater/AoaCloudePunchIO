@@ -9,8 +9,8 @@ from typing import Optional, List, Callable, Any
 from playwright.async_api import async_playwright, Browser, Page
 from loguru import logger
 
-from .models import LoginCredentials, PunchAction, PunchResult, GPSConfig
-from .retry_handler import retry_on_error, default_retry_handler, LoginError, NavigationError, PunchActionError, NetworkError, BrowserError
+from src.models import LoginCredentials, PunchAction, PunchResult, GPSConfig
+from src.retry_handler import retry_on_error, default_retry_handler, LoginError, NavigationError, PunchActionError, NetworkError, BrowserError
 
 
 class AoaCloudPunchClock:

@@ -1,0 +1,123 @@
+# Docker 建構時忽略的檔案和目錄
+
+# Git 相關
+.git
+.gitignore
+.gitattributes
+
+# 編輯器和 IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Python 相關
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+*.pyc
+
+# 虛擬環境
+.env/
+.venv/
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# 測試相關
+.tox/
+.coverage
+.coverage.*
+.cache
+.pytest_cache/
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# pyenv
+.python-version
+
+# 專案特定的忽略檔案
+screenshots/
+logs/
+*.log
+*.sqlite
+*.db
+
+# 配置檔案（包含敏感資訊）
+config.json
+.env
+
+# 文檔和說明
+README.md
+docs/
+*.md
+
+# CI/CD 相關
+.github/
+.gitlab-ci.yml
+
+# Docker 相關
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# 暫存檔案
+tmp/
+temp/
+.tmp/
+
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Linux
+*~
+
+# 備份檔案
+*.bak
+*.backup
+
+# 開發工具配置
+.editorconfig
+.flake8
+.mypy.ini
+pyproject.toml
+uv.lock
+
+# 測試結果
+test-results/
+coverage/
+
+# 本地開發檔案
+local/
+private/

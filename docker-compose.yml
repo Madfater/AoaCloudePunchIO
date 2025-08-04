@@ -1,0 +1,148 @@
+# Docker Compose 配置檔案
+# 震旦HR系統自動打卡服務
+
+version: '3.8'
+
+services:
+  # 主要的自動打卡服務
+  punch-scheduler:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runtime
+    image: aoacloud-punch:latest
+    container_name: aoacloud-punch-scheduler
+    restart: unless-stopped
+    
+    # 環境變數配置
+    environment:
+      - TZ=Asia/Taipei
+      - PYTHONUNBUFFERED=1
+      - LOG_LEVEL=INFO
+    
+    # 掛載配置檔案和日誌目錄
+    volumes:
+      - ./config.json:/app/config.json:ro  # 只讀配置檔案
+      - ./logs:/app/logs                   # 日誌目錄
+      - ./screenshots:/app/screenshots     # 截圖目錄
+    
+    # 預設執行排程模式
+    command: ["uv", "run", "python", "main.py", "--schedule"]
+    
+    # 健康檢查
+    healthcheck:
+      test: ["CMD", "python", "-c", "import sys; sys.path.insert(0, '/app/src'); from config import config_manager; config_manager.load_config()"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    
+    # 網路設定（如果需要）
+    # networks:
+    #   - punch-network
+    
+    # 資源限制
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '0.5'
+        reservations:
+          memory: 512M
+          cpus: '0.25'
+    
+    # 日誌配置
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # 測試服務（用於開發和測試）
+  punch-test:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runtime
+    image: aoacloud-punch:latest
+    container_name: aoacloud-punch-test
+    profiles: ["test"]  # 僅在 test profile 時啟動
+    
+    environment:
+      - TZ=Asia/Taipei
+      - PYTHONUNBUFFERED=1
+      - LOG_LEVEL=DEBUG
+    
+    volumes:
+      - ./config.json:/app/config.json:ro
+      - ./logs:/app/logs
+      - ./screenshots:/app/screenshots
+    
+    # 測試模式命令
+    command: ["uv", "run", "python", "main.py"]
+    
+    # 測試服務不需要自動重啟
+    restart: "no"
+
+# 網路配置（如果需要）
+# networks:
+#   punch-network:
+#     driver: bridge
+
+# 資料卷配置（如果需要持久化）
+volumes:
+  logs:
+    driver: local
+  screenshots:
+    driver: local
+
+# ============================================
+# 使用說明
+# ============================================
+
+# 1. 基本使用（啟動排程器）:
+#    docker-compose up -d
+
+# 2. 檢視日誌:
+#    docker-compose logs -f punch-scheduler
+
+# 3. 停止服務:
+#    docker-compose down
+
+# 4. 重新建構並啟動:
+#    docker-compose up -d --build
+
+# 5. 執行測試（不啟動排程器）:
+#    docker-compose --profile test up punch-test
+
+# 6. 進入容器進行偵錯:
+#    docker-compose exec punch-scheduler bash
+
+# 7. 檢視容器狀態:
+#    docker-compose ps
+
+# 8. 執行一次性測試:
+#    docker-compose run --rm punch-test uv run python main.py --real-punch --sign-in
+
+# ============================================
+# 環境變數配置範例（可建立 .env 檔案）
+# ============================================
+# 
+# # .env 檔案內容範例:
+# TZ=Asia/Taipei
+# LOG_LEVEL=INFO
+# COMPANY_ID=your_company_id
+# USER_ID=your_user_id  
+# PASSWORD=your_password
+#
+# 如果使用 .env 檔案，docker-compose 會自動載入
+
+# ============================================
+# 生產環境配置建議
+# ============================================
+#
+# 1. 使用 secrets 管理敏感資訊
+# 2. 設定適當的資源限制
+# 3. 配置日誌輪轉
+# 4. 設定監控和告警
+# 5. 使用外部配置管理（如 Kubernetes ConfigMap）

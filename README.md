@@ -1,6 +1,6 @@
-# 震旦HR系統自動打卡程式
+# 自動打卡程式
 
-使用 Python 和 Playwright 開發的網頁自動化打卡系統，專為震旦HR系統 (AoaCloud) 設計，支援GPS定位、排程自動打卡功能。
+使用 Python 和 Playwright 開發的網頁自動化打卡系統，支援 GPS 定位、排程自動打卡功能。
 
 ## 主要功能
 
@@ -35,7 +35,7 @@ AoaCloudePunchIO/
 │   └── visual_test.py     # 視覺化測試系統
 ├── main.py               # 主程式入口
 ├── main_visual.py        # 視覺化測試工具
-├── config.example.json   # 設定檔範例
+├── .env.example         # 環境變數範例檔案
 ├── Dockerfile           # 容器化設定
 ├── docker-compose.yml   # Docker Compose 設定
 └── docs/               # 文件目錄
@@ -78,38 +78,37 @@ uv sync
 uv run playwright install chromium
 ```
 
-### 4. 設定檔設置
+### 4. 環境變數設置
 
 ```bash
-# 複製設定檔範例
-cp config.example.json config.json
+# 複製環境變數範例檔案
+cp .env.example .env
 
-# 編輯設定檔填入您的資訊
-nano config.json
+# 編輯環境變數檔案填入您的資訊
+nano .env
 ```
 
-設定檔內容：
-```json
-{
-  "login": {
-    "company_id": "您的公司代號",
-    "user_id": "您的使用者帳號",
-    "password": "您的密碼"
-  },
-  "schedule": {
-    "clock_in_time": "09:00",
-    "clock_out_time": "18:00",
-    "enabled": true,
-    "weekdays_only": true
-  },
-  "gps": {
-    "latitude": 25.0330,
-    "longitude": 121.5654,
-    "address": "台北市"
-  },
-  "debug": false,
-  "headless": true
-}
+環境變數設定內容：
+```bash
+# 基本登入資訊
+COMPANY_ID=您的公司代號
+USER_ID=您的使用者帳號
+PASSWORD=您的密碼
+
+# 排程設定
+CLOCK_IN_TIME=09:00
+CLOCK_OUT_TIME=18:00
+SCHEDULE_ENABLED=true
+WEEKDAYS_ONLY=true
+
+# GPS 定位設定
+GPS_LATITUDE=25.0330
+GPS_LONGITUDE=121.5654
+GPS_ADDRESS=台北市
+
+# 系統設定
+DEBUG=false
+HEADLESS=true
 ```
 
 ## 使用方式
@@ -169,53 +168,52 @@ docker-compose down
 
 ```bash
 # 建立映像
-docker build -t aoacloud-punch:latest .
+docker build -t ghcr.io/madfater/aoacloudepunchio:latest .
 
 # 執行容器
 docker run -d \
   --name punch-scheduler \
-  -v $(pwd)/config.json:/app/config.json:ro \
+  --env-file .env \
   -v $(pwd)/logs:/app/logs \
-  aoacloud-punch:latest
+  ghcr.io/madfater/aoacloudepunchio:latest
 ```
 
 ## 進階設定
 
 ### 環境變數設定
 
-您也可以使用環境變數來設定：
+本專案使用環境變數進行配置管理，提供更好的安全性：
 
 ```bash
+# 設定必要的環境變數
 export COMPANY_ID="your_company_id"
 export USER_ID="your_user_id"
 export PASSWORD="your_password"
+
+# 或使用 .env 檔案管理
+cp .env.example .env
+# 編輯 .env 檔案填入您的設定
 ```
 
 ### 排程設定
 
-在 `config.json` 中調整排程時間：
+在 `.env` 檔案中調整排程時間：
 
-```json
-{
-  "schedule": {
-    "clock_in_time": "08:30",
-    "clock_out_time": "17:30",
-    "enabled": true,
-    "weekdays_only": true
-  }
-}
+```bash
+# 排程設定
+CLOCK_IN_TIME=08:30
+CLOCK_OUT_TIME=17:30
+SCHEDULE_ENABLED=true
+WEEKDAYS_ONLY=true
 ```
 
 ### GPS 定位設定
 
-```json
-{
-  "gps": {
-    "latitude": 25.0330,
-    "longitude": 121.5654,
-    "address": "台北市信義區"
-  }
-}
+```bash
+# GPS 定位設定
+GPS_LATITUDE=25.0330
+GPS_LONGITUDE=121.5654
+GPS_ADDRESS=台北市信義區
 ```
 
 ## 開發和貢獻
@@ -243,6 +241,7 @@ import sys
 sys.path.insert(0, 'src')
 from config import config_manager
 config_manager.load_config()
+print('✅ 配置系統正常')
 "
 
 # 模組導入測試
@@ -251,6 +250,8 @@ import sys
 sys.path.insert(0, 'src')
 from punch_clock import AoaCloudPunchClock
 from scheduler import scheduler_manager
+from models import PunchAction
+print('✅ 模組載入正常')
 "
 ```
 
@@ -301,10 +302,10 @@ result = await runner.run_full_test()
    uv run playwright install-deps
    ```
 
-2. **設定檔格式錯誤**
+2. **環境變數設定錯誤**
    ```bash
-   # 驗證設定檔格式
-   python -c "import json; json.load(open('config.json'))"
+   # 檢查環境變數是否正確載入
+   uv run python -c "from src.config import config_manager; config_manager.load_config(); print('環境變數載入成功')"
    ```
 
 3. **Docker 權限問題**
@@ -316,9 +317,9 @@ result = await runner.run_full_test()
 ## 安全性注意事項
 
 ### 資料安全
-- 設定檔中不要硬編碼敏感資訊
-- 使用環境變數管理帳號密碼
-- 確保設定檔案權限正確
+- 使用 .env 檔案管理敏感資訊
+- 確保 .env 檔案不被提交到版本控制
+- 確保環境變數檔案權限正確（600）
 
 ### 網路安全
 - 僅連接信任的HR系統
@@ -343,6 +344,35 @@ result = await runner.run_full_test()
 - 執行錯誤
 - 網路狀況
 - 系統效能
+
+## CI/CD 管道
+
+本專案使用 GitHub Actions 實現自動化建構和部署：
+
+### 工作流程包含
+- ✅ **程式碼品質檢查**: Ruff 和 mypy
+- ✅ **Docker 建構**: 自動建構多平台映像 (linux/amd64, linux/arm64)
+- ✅ **安全掃描**: Trivy 漏洞掃描
+- ✅ **自動部署**: 推送到 GitHub Container Registry
+
+### 映像標籤格式
+```bash
+# 主要映像
+ghcr.io/madfater/aoacloudepunchio:latest
+
+# 分支映像
+ghcr.io/madfater/aoacloudepunchio:master
+
+# 版本標籤 (當建立 release 時)
+ghcr.io/madfater/aoacloudepunchio:v1.0.0
+```
+
+### 使用預建映像
+```bash
+# 直接使用預建映像
+docker pull ghcr.io/madfater/aoacloudepunchio:latest
+docker run -d --env-file .env ghcr.io/madfater/aoacloudepunchio:latest
+```
 
 ## 參與貢獻
 

@@ -5,7 +5,15 @@
 from datetime import datetime
 from pathlib import Path
 from typing import List, Optional
+from enum import Enum
 from pydantic import BaseModel
+
+
+class PunchAction(str, Enum):
+    """打卡動作類型枚舉"""
+    SIGN_IN = "sign_in"      # 簽到
+    SIGN_OUT = "sign_out"    # 簽退
+    SIMULATE = "simulate"    # 模擬模式
 
 
 class LoginCredentials(BaseModel):
@@ -15,12 +23,30 @@ class LoginCredentials(BaseModel):
     password: str    # 密碼
 
 
+class PunchResult(BaseModel):
+    """打卡操作結果資料模型"""
+    success: bool                      # 是否成功
+    action: PunchAction               # 執行的動作類型
+    timestamp: datetime               # 操作時間戳
+    message: str                      # 結果訊息
+    server_response: Optional[str] = None  # 伺服器回應訊息
+    screenshot_path: Optional[Path] = None # 結果截圖路徑
+    is_simulation: bool = False       # 是否為模擬模式
+    
+    
 class PunchClockResult(BaseModel):
-    """打卡結果資料模型"""
+    """打卡結果資料模型（保持向後兼容）"""
     success: bool
     timestamp: datetime
     message: str
     punch_type: str  # "clock_in" 或 "clock_out"
+
+
+class GPSConfig(BaseModel):
+    """GPS 定位設定"""
+    latitude: float = 25.0330  # 緯度（預設：台北市內湖路一段604號）
+    longitude: float = 121.5654 # 經度
+    address: str = "台北市"  # 地址描述
 
 
 class ScheduleConfig(BaseModel):
@@ -35,6 +61,7 @@ class AppConfig(BaseModel):
     """應用程式設定"""
     login: LoginCredentials
     schedule: ScheduleConfig
+    gps: GPSConfig = GPSConfig()  # GPS 設定，使用預設值
     debug: bool = False
     headless: bool = True
 

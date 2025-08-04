@@ -10,6 +10,11 @@
     "enabled": true,
     "weekdays_only": true
   },
+  "gps": {
+    "latitude": 25.0707968,
+    "longitude": 121.5791104,
+    "address": "台北市內湖路一段604號"
+  },
   "debug": false,
   "headless": true
 }

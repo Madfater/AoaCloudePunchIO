@@ -8,7 +8,7 @@ from typing import Optional
 from dotenv import load_dotenv
 import json
 
-from .models import LoginCredentials, ScheduleConfig, AppConfig
+from .models import LoginCredentials, ScheduleConfig, AppConfig, GPSConfig
 
 
 class ConfigManager:
@@ -67,6 +67,11 @@ class ConfigManager:
                 "clock_out_time": "18:00",  
                 "enabled": True,
                 "weekdays_only": True
+            },
+            "gps": {
+                "latitude": 25.0330,
+                "longitude": 121.5654,
+                "address": "台北市"
             },
             "debug": False,
             "headless": True

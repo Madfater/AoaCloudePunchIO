@@ -6,6 +6,7 @@
 import asyncio
 import sys
 from pathlib import Path
+from datetime import datetime
 
 # 將src目錄加入Python路徑
 sys.path.insert(0, str(Path(__file__).parent / "src"))
@@ -13,7 +14,8 @@ sys.path.insert(0, str(Path(__file__).parent / "src"))
 from loguru import logger
 from src.punch_clock import AoaCloudPunchClock
 from src.config import config_manager
-from src.models import PunchAction
+from src.models import PunchAction, PunchResult
+from src.scheduler import scheduler_manager
 
 
 async def test_complete_flow(real_punch: bool = False, punch_action: str = None):
@@ -130,8 +132,6 @@ async def execute_punch_operation(punch_clock, action: PunchAction, real_punch: 
     
     if not page_status.get(available_key, True):
         logger.warning(f"⚠️ {action_name} 按鈕不可用，跳過測試")
-        from datetime import datetime
-        from src.models import PunchResult
         return PunchResult(
             success=False,
             action=action,
@@ -160,8 +160,6 @@ async def execute_punch_operation(punch_clock, action: PunchAction, real_punch: 
         logger.info(f"🎯 模擬 {action_name} 操作...")
         simulate_success = await punch_clock.simulate_punch_action(action.value)
         
-        from datetime import datetime
-        from src.models import PunchResult
         result = PunchResult(
             success=simulate_success,
             action=action,
@@ -178,6 +176,93 @@ async def execute_punch_operation(punch_clock, action: PunchAction, real_punch: 
     return result
 
 
+async def punch_callback(action: PunchAction) -> PunchResult:
+    """排程器打卡回調函數"""
+    logger.info(f"排程器觸發打卡: {action.value}")
+    
+    try:
+        # 載入配置
+        config = config_manager.load_config()
+        credentials = config_manager.get_login_credentials()
+        
+        async with AoaCloudPunchClock(headless=True, enable_screenshots=True, gps_config=config.gps) as punch_clock:
+            # 登入
+            login_success = await punch_clock.login(credentials)
+            if not login_success:
+                return PunchResult(
+                    success=False,
+                    action=action,
+                    timestamp=datetime.now(),
+                    message="登入失敗",
+                    is_simulation=False
+                )
+            
+            # 導航到打卡頁面
+            navigation_success = await punch_clock.navigate_to_punch_page()
+            if not navigation_success:
+                return PunchResult(
+                    success=False,
+                    action=action,
+                    timestamp=datetime.now(),
+                    message="導航到打卡頁面失敗",
+                    is_simulation=False
+                )
+            
+            # 執行真實打卡操作（排程模式自動確認）
+            result = await punch_clock.execute_real_punch_action(action, confirm=True)
+            return result
+            
+    except Exception as e:
+        logger.error(f"排程打卡過程發生錯誤: {e}")
+        return PunchResult(
+            success=False,
+            action=action,
+            timestamp=datetime.now(),
+            message=f"排程打卡錯誤: {e}",
+            is_simulation=False
+        )
+
+
+async def run_scheduler():
+    """運行排程器"""
+    logger.info("🕐 啟動自動打卡排程器...")
+    
+    try:
+        # 初始化排程器
+        await scheduler_manager.initialize(punch_callback)
+        
+        # 顯示排程狀態
+        status = scheduler_manager.scheduler.get_job_status()
+        if status['jobs']:
+            logger.info("📅 已設定的排程任務:")
+            for job in status['jobs']:
+                logger.info(f"  • {job['name']}: {job['next_run']}")
+        else:
+            logger.warning("⚠️ 未找到任何排程任務")
+            return
+        
+        logger.info("⏰ 排程器運行中... 按 Ctrl+C 停止")
+        
+        # 保持程式運行
+        try:
+            while True:
+                await asyncio.sleep(60)  # 每分鐘檢查一次
+                
+                # 可以在這裡添加狀態檢查邏輯
+                next_runs = scheduler_manager.scheduler.get_next_runs()
+                if next_runs:
+                    logger.debug(f"下次執行時間: {next_runs}")
+                    
+        except KeyboardInterrupt:
+            logger.info("💤 收到停止信號，正在關閉排程器...")
+        
+    except Exception as e:
+        logger.error(f"排程器運行錯誤: {e}")
+    finally:
+        await scheduler_manager.shutdown()
+        logger.info("📴 排程器已停止")
+
+
 def main():
     """主程式入口"""
     import argparse
@@ -192,6 +277,7 @@ def main():
   python main.py --real-punch             # 真實打卡模式（需要確認）
   python main.py --real-punch --sign-in   # 執行真實簽到
   python main.py --real-punch --sign-out  # 執行真實簽退
+  python main.py --schedule               # 啟動排程器（自動打卡）
         """
     )
     
@@ -213,6 +299,12 @@ def main():
         help='僅執行簽退操作'
     )
     
+    parser.add_argument(
+        '--schedule',
+        action='store_true',
+        help='啟動排程器模式（根據配置檔案自動打卡）'
+    )
+    
     args = parser.parse_args()
     
     print("🤖 震旦HR系統自動打卡工具")
@@ -223,6 +315,20 @@ def main():
         print("⚠️  未找到配置檔案，正在建立範例配置...")
         config_manager.create_example_config()
         print("📝 已建立 config.example.json，請複製為 config.json 並填入您的資訊")
+        return
+    
+    # 檢查排程模式
+    if args.schedule:
+        if args.real_punch or args.sign_in or args.sign_out:
+            print("❌ 排程模式不能與其他打卡選項同時使用")
+            return
+        
+        print("🕐 啟動排程器模式")
+        print("💡 系統將根據配置檔案自動執行打卡")
+        print()
+        
+        # 運行排程器
+        asyncio.run(run_scheduler())
         return
     
     # 確定要執行的打卡動作

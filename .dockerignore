@@ -111,8 +111,8 @@ Desktop.ini
 .editorconfig
 .flake8
 .mypy.ini
-pyproject.toml
-uv.lock
+# pyproject.toml  # 需要保留以供 Docker 建構使用
+# uv.lock         # 需要保留以供 Docker 建構使用
 
 # 測試結果
 test-results/

@@ -95,11 +95,11 @@ async def run_comprehensive_test(args):
     print(f"🎯 震旦HR系統專門視覺化測試 - {test_type}模式")
     print("=" * 50)
     
-    # 檢查配置檔案
-    if not Path("config.json").exists():
-        print("⚠️  未找到配置檔案，正在建立範例配置...")
-        config_manager.create_example_config()
-        print("📝 已建立 config.example.json，請複製為 config.json 並填入您的資訊")
+    # 檢查環境變數檔案
+    if not Path(".env").exists():
+        print("⚠️  未找到環境變數檔案，請建立 .env 檔案")
+        print("📝 請複製 .env.example 為 .env 並填入您的資訊：")
+        print("   cp .env.example .env")
         return False
     
     try:

@@ -54,12 +54,15 @@ jobs:
     
     - name: 基本功能測試
       run: |
+        # 建立測試環境變數檔案
+        cp .env.example .env
+        
         # 測試配置載入
         uv run python -c "
         import sys
         sys.path.insert(0, 'src')
         from config import config_manager
-        config_manager.create_example_config()
+        config_manager.load_config()
         print('✅ 配置系統正常')
         "
         

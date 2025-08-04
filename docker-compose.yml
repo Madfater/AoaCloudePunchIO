@@ -34,7 +34,7 @@ services:
     
     # 健康檢查
     healthcheck:
-      test: ["CMD", "python", "-c", "import sys; sys.path.insert(0, '/app/src'); from config import config_manager; config_manager.load_config()"]
+      test: ["CMD", "python", "-c", "import sys; sys.path.insert(0, '/app/src'); from config import config_manager; config_manager.load_config(); print('Config loaded successfully')"]
       interval: 30s
       timeout: 10s
       retries: 3

@@ -242,7 +242,7 @@ uv run python -c "
 import sys
 sys.path.insert(0, 'src')
 from config import config_manager
-config_manager.create_example_config()
+config_manager.load_config()
 "
 
 # 模組導入測試

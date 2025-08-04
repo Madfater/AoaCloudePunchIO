@@ -10,6 +10,7 @@ from playwright.async_api import async_playwright, Browser, Page
 from loguru import logger
 
 from .models import LoginCredentials, PunchAction, PunchResult, GPSConfig
+from .retry_handler import retry_on_error, default_retry_handler, LoginError, NavigationError, PunchActionError, NetworkError, BrowserError
 
 
 class AoaCloudPunchClock:
@@ -174,6 +175,7 @@ class AoaCloudPunchClock:
         """獲取已截取的截圖列表"""
         return self._screenshots_taken.copy()
             
+    @retry_on_error(max_attempts=3, base_delay=2.0, error_context="登入流程")
     async def login(self, credentials: LoginCredentials) -> bool:
         """登入震旦HR系統"""
         try:
@@ -182,9 +184,10 @@ class AoaCloudPunchClock:
             response = await self.page.goto(self._base_url, wait_until='networkidle')
             
             if not response or response.status != 200:
-                logger.error(f"無法載入登入頁面，狀態碼: {response.status if response else 'None'}")
+                error_msg = f"無法載入登入頁面，狀態碼: {response.status if response else 'None'}"
+                logger.error(error_msg)
                 await self._take_error_screenshot("頁面載入失敗")
-                return False
+                raise NetworkError(error_msg)
             
             logger.info("登入頁面載入成功")
             await self._take_screenshot("page_loaded", "登入頁面載入完成")
@@ -213,19 +216,27 @@ class AoaCloudPunchClock:
                 await self._take_screenshot("login_success", f"登入成功頁面 - {current_url}")
                 return True
             else:
-                logger.error("登入失敗：未能成功跳轉")
+                error_msg = "登入失敗：未能成功跳轉"
+                logger.error(error_msg)
                 await self._take_error_screenshot("登入失敗")
-                return False
+                raise LoginError(error_msg)
                 
+        except LoginError:
+            # LoginError 已經在上面處理了，直接重新拋出
+            raise
         except Exception as e:
             logger.error(f"登入過程中發生錯誤: {e}")
             await self._take_error_screenshot(f"登入異常: {str(e)}")
-            return False
+            # 根據錯誤類型決定是否要重試
+            if "timeout" in str(e).lower() or "network" in str(e).lower():
+                raise NetworkError(f"網路錯誤: {e}")
+            else:
+                raise BrowserError(f"瀏覽器錯誤: {e}")
     
+    @retry_on_error(max_attempts=3, base_delay=1.5, error_context="導航到打卡頁面")
     async def navigate_to_punch_page(self) -> bool:
         """導航到出勤打卡頁面（帶重試機制）"""
-        async def _do_navigation():
-            logger.info("準備導航到出勤打卡頁面...")
+        logger.info("準備導航到出勤打卡頁面...")
             
             # 等待主頁面載入完成
             await self.page.wait_for_load_state('networkidle', timeout=10000)

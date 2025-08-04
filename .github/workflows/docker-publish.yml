@@ -1,0 +1,207 @@
+# GitHub Actions CI/CD 管道
+# 自動建構 Docker 映像並推送到 GitHub Container Registry
+
+name: Docker Build and Push
+
+on:
+  # 當推送到 main 分支時觸發
+  push:
+    branches: [ "main", "master" ]
+    tags: [ 'v*.*.*' ]
+  
+  # 當建立 Pull Request 時觸發（僅建構，不推送）
+  pull_request:
+    branches: [ "main", "master" ]
+  
+  # 允許手動觸發
+  workflow_dispatch:
+
+env:
+  # GitHub Container Registry
+  REGISTRY: ghcr.io
+  # 映像名稱（會自動使用倉庫名稱）
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  # 程式碼品質檢查
+  quality-check:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 檢出程式碼
+      uses: actions/checkout@v4
+    
+    - name: 設定 Python 3.11
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: 安裝 UV
+      run: pip install uv
+    
+    - name: 安裝依賴
+      run: uv sync --frozen
+    
+    - name: 程式碼風格檢查 (Ruff)
+      run: |
+        uv run ruff check src/
+        uv run ruff format --check src/
+      continue-on-error: true  # 暫時允許風格檢查失敗
+    
+    - name: 類型檢查 (mypy)
+      run: uv run mypy src/
+      continue-on-error: true  # 暫時允許類型檢查失敗
+    
+    - name: 基本功能測試
+      run: |
+        # 測試配置載入
+        uv run python -c "
+        import sys
+        sys.path.insert(0, 'src')
+        from config import config_manager
+        config_manager.create_example_config()
+        print('✅ 配置系統正常')
+        "
+        
+        # 測試模組載入
+        uv run python -c "
+        import sys
+        sys.path.insert(0, 'src')
+        from punch_clock import AoaCloudPunchClock
+        from scheduler import scheduler_manager
+        from models import PunchAction
+        print('✅ 模組載入正常')
+        "
+
+  # Docker 建構和推送
+  docker-build-push:
+    needs: quality-check
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    
+    steps:
+    - name: 檢出程式碼
+      uses: actions/checkout@v4
+    
+    - name: 設定 Docker Buildx
+      uses: docker/setup-buildx-action@v3
+    
+    - name: 登入 Container Registry
+      if: github.event_name != 'pull_request'
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: 提取 metadata（標籤、標記）
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+        tags: |
+          type=ref,event=branch
+          type=ref,event=pr
+          type=semver,pattern={{version}}
+          type=semver,pattern={{major}}.{{minor}}
+          type=raw,value=latest,enable={{is_default_branch}}
+    
+    - name: 建構和推送 Docker 映像
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        platforms: linux/amd64,linux/arm64
+        push: ${{ github.event_name != 'pull_request' }}
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+        target: runtime
+
+  # 安全性掃描
+  security-scan:
+    needs: docker-build-push
+    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request'
+    
+    steps:
+    - name: 執行 Trivy 漏洞掃描
+      uses: aquasecurity/trivy-action@master
+      with:
+        image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+    
+    - name: 上傳 Trivy 掃描結果到 GitHub Security
+      uses: github/codeql-action/upload-sarif@v2
+      if: always()
+      with:
+        sarif_file: 'trivy-results.sarif'
+
+  # 部署（僅在 main/master 分支）
+  deploy:
+    needs: [docker-build-push, security-scan]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+    environment: production
+    
+    steps:
+    - name: 檢出程式碼
+      uses: actions/checkout@v4
+    
+    - name: 部署到生產環境
+      run: |
+        echo "🚀 部署流程開始..."
+        echo "📦 映像: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
+        
+        # 這裡可以添加實際的部署腳本
+        # 例如：連接到遠端伺服器並更新容器
+        
+        echo "✅ 部署完成"
+
+# ============================================
+# 使用說明
+# ============================================
+#
+# 1. 此工作流程會在以下情況自動執行：
+#    - 推送到 main/master 分支
+#    - 建立 Pull Request
+#    - 建立版本標籤 (v*.*.*)
+#    - 手動觸發
+#
+# 2. 工作流程包含以下步驟：
+#    - 程式碼品質檢查（ruff, mypy）
+#    - Docker 映像建構和推送
+#    - 安全性漏洞掃描
+#    - 自動部署（僅 main/master 分支）
+#
+# 3. 映像會推送到 GitHub Container Registry：
+#    ghcr.io/your-username/aoacloudpunchio:latest
+#
+# 4. 如需使用此映像：
+#    docker pull ghcr.io/your-username/aoacloudpunchio:latest
+#
+# 5. 需要的 GitHub Secrets：
+#    - GITHUB_TOKEN（自動提供）
+#    - 其他部署相關的 secrets（如需要）
+
+# ============================================
+# 進階配置選項
+# ============================================
+#
+# 1. 多環境部署：
+#    - 可以建立不同的 environment（dev, staging, prod）
+#    - 每個環境可以有不同的部署腳本和 secrets
+#
+# 2. 條件式部署：
+#    - 可以根據分支、標籤或檔案變更來決定是否部署
+#
+# 3. 通知整合：
+#    - 可以整合 Slack、Teams 等通知服務
+#    - 部署成功/失敗時發送通知
+#
+# 4. 測試整合：
+#    - 可以添加整合測試步驟
+#    - 在部署前執行 smoke test

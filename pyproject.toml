@@ -2,7 +2,6 @@
 name = "aoacloudpunchio"
 version = "0.1.0"
 description = "Automated punch clock system for AoaCloud ERP"
-readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
     "playwright>=1.45.0",

@@ -20,9 +20,12 @@ services:
       - PYTHONUNBUFFERED=1
       - LOG_LEVEL=INFO
     
-    # 掛載配置檔案和日誌目錄
+    # 使用環境變數檔案
+    env_file:
+      - .env                              # 環境變數配置檔案
+    
+    # 掛載日誌和截圖目錄
     volumes:
-      - ./config.json:/app/config.json:ro  # 只讀配置檔案
       - ./logs:/app/logs                   # 日誌目錄
       - ./screenshots:/app/screenshots     # 截圖目錄
     
@@ -73,8 +76,11 @@ services:
       - PYTHONUNBUFFERED=1
       - LOG_LEVEL=DEBUG
     
+    # 使用環境變數檔案
+    env_file:
+      - .env                              # 環境變數配置檔案
+    
     volumes:
-      - ./config.json:/app/config.json:ro
       - ./logs:/app/logs
       - ./screenshots:/app/screenshots
     
@@ -125,17 +131,21 @@ volumes:
 #    docker-compose run --rm punch-test uv run python main.py --real-punch --sign-in
 
 # ============================================
-# 環境變數配置範例（可建立 .env 檔案）
+# 環境變數配置說明
 # ============================================
 # 
-# # .env 檔案內容範例:
-# TZ=Asia/Taipei
-# LOG_LEVEL=INFO
-# COMPANY_ID=your_company_id
-# USER_ID=your_user_id  
-# PASSWORD=your_password
+# 1. 複製環境變數範例檔案:
+#    cp .env.example .env
 #
-# 如果使用 .env 檔案，docker-compose 會自動載入
+# 2. 編輯 .env 檔案設定所有必要的環境變數:
+#    - COMPANY_ID=your_company_id
+#    - USER_ID=your_user_id  
+#    - PASSWORD=your_password
+#    - CLOCK_IN_TIME=09:00
+#    - CLOCK_OUT_TIME=18:00
+#    - ... (其他必要變數)
+#
+# 3. docker-compose 會自動載入 .env 檔案
 
 # ============================================
 # 生產環境配置建議

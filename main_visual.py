@@ -21,6 +21,7 @@ sys.path.insert(0, str(Path(__file__).parent / "src"))
 from loguru import logger
 from src.config import config_manager
 from src.visual_test import VisualTestRunner
+from src.models import PunchAction
 
 
 def setup_logger(log_level: str = "INFO", log_file: str = None):
@@ -90,7 +91,8 @@ def save_test_result_json(test_result, output_path: Path):
 
 async def run_comprehensive_test(args):
     """執行全面的視覺化測試"""
-    print("🎯 震旦HR系統專門視覺化測試")
+    test_type = "真實打卡" if args.real_punch else "模擬"
+    print(f"🎯 震旦HR系統專門視覺化測試 - {test_type}模式")
     print("=" * 50)
     
     # 檢查配置檔案
@@ -101,29 +103,53 @@ async def run_comprehensive_test(args):
         return False
     
     try:
-        # 載入憑證
+        # 載入配置
+        config = config_manager.load_config()
         credentials = config_manager.get_login_credentials()
+        
+        # 確定打卡動作
+        punch_action = None
+        if args.sign_in and args.sign_out:
+            print("❌ 不能同時指定 --sign-in 和 --sign-out")
+            return False
+        elif args.sign_in:
+            punch_action = PunchAction.SIGN_IN
+        elif args.sign_out:
+            punch_action = PunchAction.SIGN_OUT
         
         # 顯示測試參數
         print(f"🔧 測試配置:")
+        print(f"   測試模式: {test_type}")
         print(f"   無頭模式: {'否' if args.show_browser else '是'}")
         print(f"   互動模式: {'是' if args.interactive else '否'}")
         print(f"   截圖目錄: {args.screenshots_dir}")
         print(f"   日誌等級: {args.log_level}")
+        if punch_action:
+            action_name = "簽到" if punch_action == PunchAction.SIGN_IN else "簽退"
+            print(f"   指定動作: {action_name}")
         if args.output_json:
             print(f"   JSON輸出: {args.output_json}")
         if args.output_html:
             print(f"   HTML報告: {args.output_html}")
+        
+        if args.real_punch:
+            print("\n⚠️ 警告：真實打卡模式已啟用！")
+            print("💡 系統將詢問您確認後才會實際點擊打卡按鈕")
+        
         print()
         
         # 創建測試執行器
         test_runner = VisualTestRunner(
             headless=not args.show_browser,
-            interactive_mode=args.interactive
+            interactive_mode=args.interactive,
+            gps_config=config.gps
         )
         
-        # 執行測試
-        test_result = await test_runner.run_login_test(credentials)
+        # 執行對應的測試
+        if args.real_punch:
+            test_result = await test_runner.run_real_punch_test(credentials, punch_action)
+        else:
+            test_result = await test_runner.run_login_test(credentials)
         
         # 保存結果
         if args.output_json:
@@ -140,7 +166,10 @@ async def run_comprehensive_test(args):
         # 顯示最終結果
         print("\n🎊 測試完成!")
         if test_result.overall_success:
-            print("✅ 所有測試步驟均成功執行")
+            if args.real_punch:
+                print("✅ 真實打卡測試成功執行")
+            else:
+                print("✅ 所有測試步驟均成功執行")
         else:
             print("❌ 部分測試步驟失敗，請查看詳細報告")
         
@@ -161,13 +190,36 @@ def parse_arguments():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 使用範例:
+  # 模擬測試（預設）
   python main_visual.py                           # 基本視覺化測試
   python main_visual.py --show-browser           # 顯示瀏覽器窗口
   python main_visual.py --interactive            # 互動模式
-  python main_visual.py --output-json report.json # 保存結果為JSON
   python main_visual.py --output-html report.html # 生成HTML報告
-  python main_visual.py --log-level DEBUG        # 詳細日誌
+  
+  # 真實打卡測試
+  python main_visual.py --real-punch              # 真實打卡測試
+  python main_visual.py --real-punch --sign-in    # 僅測試真實簽到
+  python main_visual.py --real-punch --sign-out   # 僅測試真實簽退
+  python main_visual.py --real-punch --show-browser --interactive  # 真實打卡+可視化
         """
+    )
+    
+    parser.add_argument(
+        '--real-punch',
+        action='store_true',
+        help='啟用真實打卡模式（實際點擊按鈕）'
+    )
+    
+    parser.add_argument(
+        '--sign-in',
+        action='store_true',
+        help='僅執行簽到操作'
+    )
+    
+    parser.add_argument(
+        '--sign-out',
+        action='store_true',
+        help='僅執行簽退操作'
     )
     
     parser.add_argument(

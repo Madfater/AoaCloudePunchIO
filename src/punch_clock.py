@@ -237,96 +237,84 @@ class AoaCloudPunchClock:
     async def navigate_to_punch_page(self) -> bool:
         """導航到出勤打卡頁面（帶重試機制）"""
         logger.info("準備導航到出勤打卡頁面...")
-            
-            # 等待主頁面載入完成
-            await self.page.wait_for_load_state('networkidle', timeout=10000)
-            await self._take_screenshot("main_page", "主頁面載入完成")
-            
-            # 尋找並點擊出勤打卡圖示
-            punch_card_selector = 'ion-col:has(p:text("出勤打卡"))'
-            
-            try:
-                await self.page.wait_for_selector(punch_card_selector, timeout=10000)
-                logger.info("找到出勤打卡圖示")
-            except:
-                # 如果找不到，嘗試其他選擇器
-                alternative_selector = 'ion-col:has(img[src*="home_01"])'
-                await self.page.wait_for_selector(alternative_selector, timeout=5000)
-                punch_card_selector = alternative_selector
-                logger.info("使用替代選擇器找到出勤打卡圖示")
-            
-            # 點擊出勤打卡圖示
-            await self.page.click(punch_card_selector)
-            logger.info("已點擊出勤打卡圖示")
-            
-            # 等待打卡頁面基本載入
-            await self.page.wait_for_load_state('domcontentloaded', timeout=15000)
-            
-            # 等待頁面標題出現，確認已到達打卡頁面
-            try:
-                await self.page.wait_for_selector('.toolbar-title', timeout=10000)
-                page_title = await self.page.text_content('.toolbar-title')
-                if not (page_title and "打卡" in page_title):
-                    raise Exception(f"頁面標題不符預期: {page_title}")
-                logger.info("成功導航到打卡頁面")
-            except Exception as title_error:
-                logger.warning("無法找到頁面標題，嘗試其他方式驗證")
-                # 嘗試查找打卡按鈕作為備用驗證
-                try:
-                    await self.page.wait_for_selector('button:has-text("簽到")', timeout=5000)
-                    logger.info("透過簽到按鈕確認已到達打卡頁面")
-                except:
-                    raise Exception("無法確認是否成功導航到打卡頁面")
-            
-            # 等待GPS定位和地圖載入完成（容忍失敗）
-            try:
-                logger.info("等待GPS定位和地圖元素載入...")
-                # 等待地圖容器出現
-                await self.page.wait_for_selector('#divImap', timeout=8000)
-                
-                # 主動觸發GPS定位（點擊定位按鈕）
-                try:
-                    locate_button = await self.page.query_selector('ion-fab button[ion-fab]')
-                    if locate_button and await locate_button.is_visible():
-                        logger.info("找到定位按鈕，主動觸發GPS定位")
-                        await locate_button.click()
-                        await asyncio.sleep(2)  # 等待定位請求
-                        logger.info("已觸發GPS定位")
-                except Exception as loc_error:
-                    logger.warning(f"無法主動觸發GPS定位: {loc_error}")
-                
-                # 等待一段時間讓GPS定位完成（不強制要求成功）
-                await asyncio.sleep(3)
-                logger.info("GPS定位等待完成")
-            except:
-                logger.warning("GPS定位載入超時，但繼續執行")
-            
-            # 等待loading spinner消失（如果存在）
-            try:
-                loading_selector = 'ion-loading'
-                if await self.page.query_selector(loading_selector):
-                    logger.info("檢測到loading狀態，等待完成...")
-                    await self.page.wait_for_selector(loading_selector, state='detached', timeout=10000)
-                    logger.info("Loading完成")
-            except:
-                logger.info("沒有檢測到loading狀態或已完成")
-            
-            # 最終截圖
-            await self._take_screenshot("punch_page_ready", "打卡頁面準備完成")
-            
-            return True
+        
+        # 等待主頁面載入完成
+        await self.page.wait_for_load_state('networkidle', timeout=10000)
+        await self._take_screenshot("main_page", "主頁面載入完成")
+        
+        # 尋找並點擊出勤打卡圖示
+        punch_card_selector = 'ion-col:has(p:text("出勤打卡"))'
         
         try:
-            return await self._retry_async_operation(
-                _do_navigation, 
-                max_retries=2, 
-                delay=2.0, 
-                operation_name="導航到打卡頁面"
-            )
-        except Exception as e:
-            logger.error(f"導航到打卡頁面最終失敗: {e}")
-            await self._take_error_screenshot(f"導航失敗: {str(e)}")
-            return False
+            await self.page.wait_for_selector(punch_card_selector, timeout=10000)
+            logger.info("找到出勤打卡圖示")
+        except:
+            # 如果找不到，嘗試其他選擇器
+            alternative_selector = 'ion-col:has(img[src*="home_01"])'
+            await self.page.wait_for_selector(alternative_selector, timeout=5000)
+            punch_card_selector = alternative_selector
+            logger.info("使用替代選擇器找到出勤打卡圖示")
+        
+        # 點擊出勤打卡圖示
+        await self.page.click(punch_card_selector)
+        logger.info("已點擊出勤打卡圖示")
+        
+        # 等待打卡頁面基本載入
+        await self.page.wait_for_load_state('domcontentloaded', timeout=15000)
+        
+        # 等待頁面標題出現，確認已到達打卡頁面
+        try:
+            await self.page.wait_for_selector('.toolbar-title', timeout=10000)
+            page_title = await self.page.text_content('.toolbar-title')
+            if not (page_title and "打卡" in page_title):
+                raise Exception(f"頁面標題不符預期: {page_title}")
+            logger.info("成功導航到打卡頁面")
+        except Exception:
+            logger.warning("無法找到頁面標題，嘗試其他方式驗證")
+            # 嘗試查找打卡按鈕作為備用驗證
+            try:
+                await self.page.wait_for_selector('button:has-text("簽到")', timeout=5000)
+                logger.info("透過簽到按鈕確認已到達打卡頁面")
+            except:
+                raise Exception("無法確認是否成功導航到打卡頁面")
+        
+        # 等待GPS定位和地圖載入完成（容忍失敗）
+        try:
+            logger.info("等待GPS定位和地圖元素載入...")
+            # 等待地圖容器出現
+            await self.page.wait_for_selector('#divImap', timeout=8000)
+            
+            # 主動觸發GPS定位（點擊定位按鈕）
+            try:
+                locate_button = await self.page.query_selector('ion-fab button[ion-fab]')
+                if locate_button and await locate_button.is_visible():
+                    logger.info("找到定位按鈕，主動觸發GPS定位")
+                    await locate_button.click()
+                    await asyncio.sleep(2)  # 等待定位請求
+                    logger.info("已觸發GPS定位")
+            except Exception as loc_error:
+                logger.warning(f"無法主動觸發GPS定位: {loc_error}")
+            
+            # 等待一段時間讓GPS定位完成（不強制要求成功）
+            await asyncio.sleep(3)
+            logger.info("GPS定位等待完成")
+        except:
+            logger.warning("GPS定位載入超時，但繼續執行")
+        
+        # 等待loading spinner消失（如果存在）
+        try:
+            loading_selector = 'ion-loading'
+            if await self.page.query_selector(loading_selector):
+                logger.info("檢測到loading狀態，等待完成...")
+                await self.page.wait_for_selector(loading_selector, state='detached', timeout=10000)
+                logger.info("Loading完成")
+        except:
+            logger.info("沒有檢測到loading狀態或已完成")
+        
+        # 最終截圖
+        await self._take_screenshot("punch_page_ready", "打卡頁面準備完成")
+        
+        return True
     
     async def simulate_punch_action(self, action: str = "sign_in") -> bool:
         """模擬打卡動作（不會真的點擊按鈕）

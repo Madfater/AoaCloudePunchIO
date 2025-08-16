@@ -1,214 +1,48 @@
-# Docker Compose 配置檔案
-# 震旦HR系統自動打卡服務
-
 services:
-  # 主要的自動打卡服務
   punch-scheduler:
     build:
       context: .
       dockerfile: Dockerfile
       target: runtime
-      args:
-        USER_ID: ${USER_ID:-1000}
-        GROUP_ID: ${GROUP_ID:-1000}
+
     image: ghcr.io/madfater/aoacloudepunchio:latest
     container_name: aoacloude-punch-scheduler
     restart: unless-stopped
-    
-    # 用戶和安全設置
-    user: "${USER_ID:-1000}:${GROUP_ID:-1000}"
-    cap_add:
-      - SYS_ADMIN  # 瀏覽器執行需要的權限
-    security_opt:
-      - seccomp:unconfined  # 允許瀏覽器系統調用
-    shm_size: '2gb'  # 瀏覽器共享記憶體大小
-    
-    # 環境變數配置
-    environment:
-      - TZ=Asia/Taipei
-      - PYTHONUNBUFFERED=1
-      - LOG_LEVEL=INFO
-    
-    # 使用環境變數檔案
+
+    ipc: host
+    shm_size: 2gb
+
     env_file:
-      - .env                              # 環境變數配置檔案
-    
-    # 掛載日誌和截圖目錄
+      - .env
+    environment:
+      TZ: Asia/Taipei
+      PYTHONUNBUFFERED: "1"
+      LOG_LEVEL: INFO
+      SCREENSHOT_ENABLED: "true"
+
     volumes:
-      - ./logs:/app/logs                   # 日誌目錄
-      - ./screenshots:/app/screenshots     # 截圖目錄
-      - ./.env:/app/.env                   # 環境變數檔案
-    
-    # 預設執行排程模式（先檢查權限）
-    command: ["sh", "-c", "/app/scripts/check_permissions.sh && uv run python main.py --schedule"]
-    
-    # 健康檢查
+      - ./logs:/app/logs:rw
+      - ./screenshots:/app/screenshots:rw
+      - ./.env:/app/.env:ro
+
     healthcheck:
       test: ["CMD", "python", "-c", "import sys; sys.path.insert(0, '/app/src'); from config import config_manager; config_manager.load_config(); print('Config loaded successfully')"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 10s
-    
-    # 網路設定（如果需要）
-    # networks:
-    #   - punch-network
-    
-    # 資源限制
+
     deploy:
       resources:
         limits:
-          memory: 1G
-          cpus: '0.5'
+          memory: 2G
+          cpus: "1.0"
         reservations:
           memory: 512M
-          cpus: '0.25'
-    
-    # 日誌配置
+          cpus: "0.25"
+
     logging:
-      driver: "json-file"
+      driver: json-file
       options:
         max-size: "10m"
         max-file: "3"
-
-  # 測試服務（用於開發和測試）
-  punch-test:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: runtime
-      args:
-        USER_ID: ${USER_ID:-1000}
-        GROUP_ID: ${GROUP_ID:-1000}
-    image: aoacloude-punch:latest
-    container_name: aoacloude-punch-test
-    profiles: ["test"]  # 僅在 test profile 時啟動
-    
-    # 用戶和安全設置
-    user: "${USER_ID:-1000}:${GROUP_ID:-1000}"
-    cap_add:
-      - SYS_ADMIN
-    security_opt:
-      - seccomp:unconfined
-    shm_size: '2gb'
-    
-    environment:
-      - TZ=Asia/Taipei
-      - PYTHONUNBUFFERED=1
-      - LOG_LEVEL=DEBUG
-    
-    # 使用環境變數檔案
-    env_file:
-      - .env                              # 環境變數配置檔案
-    
-    volumes:
-      - ./logs:/app/logs
-      - ./screenshots:/app/screenshots
-      - ./.env:/app/.env                   # 環境變數檔案
-    
-    # 測試模式命令（先檢查權限）
-    command: ["sh", "-c", "/app/scripts/check_permissions.sh && uv run python main.py"]
-    
-    # 測試服務不需要自動重啟
-    restart: "no"
-
-# 網路配置（如果需要）
-# networks:
-#   punch-network:
-#     driver: bridge
-
-# 資料卷配置（如果需要持久化）
-volumes:
-  logs:
-    driver: local
-  screenshots:
-    driver: local
-
-# ============================================
-# 使用說明
-# ============================================
-
-# 1. 基本使用（啟動排程器）:
-#    docker-compose up -d
-
-# 2. 檢視日誌:
-#    docker-compose logs -f punch-scheduler
-
-# 3. 停止服務:
-#    docker-compose down
-
-# 4. 重新建構並啟動:
-#    docker-compose up -d --build
-
-# 5. 執行測試（不啟動排程器）:
-#    docker-compose --profile test up punch-test
-
-# 6. 進入容器進行偵錯:
-#    docker-compose exec punch-scheduler bash
-
-# 7. 檢視容器狀態:
-#    docker-compose ps
-
-# 8. 執行一次性測試:
-#    docker-compose run --rm punch-test uv run python main.py --real-punch --sign-in
-#
-# 9. 檢查權限問題:
-#    docker-compose run --rm punch-test /app/check_permissions.sh
-#
-# 10. 設定正確的用戶權限（Linux/macOS）:
-#     export USER_ID=$(id -u) && export GROUP_ID=$(id -g)
-#     docker-compose up -d --build
-
-# ============================================
-# 環境變數配置說明
-# ============================================
-# 
-# 1. 複製環境變數範例檔案:
-#    cp .env.example .env
-#
-# 2. 編輯 .env 檔案設定所有必要的環境變數:
-#    - COMPANY_ID=your_company_id
-#    - USER_ID=your_user_id  
-#    - PASSWORD=your_password
-#    - CLOCK_IN_TIME=09:00
-#    - CLOCK_OUT_TIME=18:00
-#    - SCHEDULE_ENABLED=true
-#    - WEEKDAYS_ONLY=true
-#    - GPS_LATITUDE=25.080763
-#    - GPS_LONGITUDE=121.569891
-#    - GPS_ADDRESS=台北市內湖區洲子街101號
-#    - DEBUG=false
-#    - HEADLESS=true
-#
-# 3. 確保 .env 檔案與 docker-compose.yml 在同一目錄
-# 4. docker-compose 會自動載入 .env 檔案並掛載到容器內
-
-# ============================================
-# 生產環境配置建議
-# ============================================
-#
-# 1. 使用 secrets 管理敏感資訊
-# 2. 設定適當的資源限制
-# 3. 配置日誌輪轉
-# 4. 設定監控和告警
-# 5. 使用外部配置管理（如 Kubernetes ConfigMap）
-
-# ============================================
-# 權限問題解決指南
-# ============================================
-#
-# 如果遇到截圖權限問題，請嘗試以下解決方案：
-#
-# 方案1：設定正確的用戶 ID（推薦）
-# export USER_ID=$(id -u) 
-# export GROUP_ID=$(id -g)
-# docker-compose up -d --build
-#
-# 方案2：使用 root 模式（簡單但較不安全）
-# 在 docker-compose.yml 中註釋掉 user 行
-#
-# 方案3：修正宿主機目錄權限
-# sudo chmod 777 ./screenshots ./logs
-#
-# 方案4：檢查權限狀態
-# docker-compose run --rm punch-test /app/check_permissions.sh

@@ -37,3 +37,9 @@ profile = "black"
 python_version = "3.11"
 warn_return_any = true
 warn_unused_configs = true
+
+[dependency-groups]
+dev = [
+    "mypy>=1.17.1",
+    "ruff>=0.12.9",
+]

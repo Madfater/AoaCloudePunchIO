@@ -38,7 +38,8 @@ class ConfigManager:
             clock_in_time=self._get_required_env('CLOCK_IN_TIME'),
             clock_out_time=self._get_required_env('CLOCK_OUT_TIME'),
             enabled=self._get_required_bool_env('SCHEDULE_ENABLED'),
-            weekdays_only=self._get_required_bool_env('WEEKDAYS_ONLY')
+            weekdays_only=self._get_required_bool_env('WEEKDAYS_ONLY'),
+            status_message_interval=self._get_optional_int_env('STATUS_MESSAGE_INTERVAL', 300)
         )
         
         # GPS 設定 - 必要參數
@@ -95,6 +96,17 @@ class ConfigManager:
             return float(value)
         except ValueError:
             raise ValueError(f"環境變數 {key} 的值 '{value}' 不是有效的數字")
+    
+    def _get_optional_int_env(self, key: str, default: int) -> int:
+        """取得可選的整數型環境變數，不存在時返回預設值"""
+        value = os.getenv(key)
+        if not value:
+            return default
+        
+        try:
+            return int(value)
+        except ValueError:
+            raise ValueError(f"環境變數 {key} 的值 '{value}' 不是有效的整數")
 
 
 # 全域實例

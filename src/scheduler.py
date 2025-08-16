@@ -4,13 +4,14 @@
 """
 
 import asyncio
-from datetime import datetime, time
+from datetime import datetime
 from typing import Optional, Callable, Dict, Any
 from loguru import logger
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from apscheduler.triggers.cron import CronTrigger
-from apscheduler.jobstores.memory import MemoryJobStore
-from apscheduler.executors.asyncio import AsyncIOExecutor
+from apscheduler.schedulers.asyncio import AsyncIOScheduler  # type: ignore
+from apscheduler.triggers.cron import CronTrigger  # type: ignore
+from apscheduler.triggers.interval import IntervalTrigger  # type: ignore
+from apscheduler.jobstores.memory import MemoryJobStore  # type: ignore
+from apscheduler.executors.asyncio import AsyncIOExecutor  # type: ignore
 
 from src.models import ScheduleConfig, PunchAction, PunchResult
 from src.config import ConfigManager
@@ -76,13 +77,15 @@ class PunchScheduler:
             await self._add_scheduled_jobs(schedule_config)
             
             # 啟動排程器
-            self.scheduler.start()
+            if self.scheduler:
+                self.scheduler.start()
             self.is_running = True
             
             logger.info("自動打卡排程器已啟動")
             logger.info(f"簽到時間: {schedule_config.clock_in_time}")
             logger.info(f"簽退時間: {schedule_config.clock_out_time}")
             logger.info(f"僅工作日: {schedule_config.weekdays_only}")
+            logger.info(f"狀態訊息間隔: {schedule_config.status_message_interval}秒")
             
         except Exception as e:
             logger.error(f"啟動排程器失敗: {e}")
@@ -108,7 +111,7 @@ class PunchScheduler:
         clock_out_hour, clock_out_minute = map(int, schedule_config.clock_out_time.split(':'))
         
         # 設定 cron 觸發器參數
-        cron_kwargs = {
+        cron_kwargs: Dict[str, Any] = {
             'hour': clock_in_hour,
             'minute': clock_in_minute,
             'second': 0
@@ -118,31 +121,42 @@ class PunchScheduler:
             cron_kwargs['day_of_week'] = '0-4'  # 週一到週五
         
         # 添加簽到任務
-        self.scheduler.add_job(
+        if self.scheduler:
+            self.scheduler.add_job(
             func=self._execute_punch_job,
             trigger=CronTrigger(**cron_kwargs),
             args=[PunchAction.SIGN_IN],
             id='clock_in_job',
             name='自動簽到',
             replace_existing=True
-        )
+            )
         
-        # 添加簽退任務
-        cron_kwargs.update({
-            'hour': clock_out_hour,
-            'minute': clock_out_minute
-        })
-        
-        self.scheduler.add_job(
+            # 添加簽退任務
+            cron_kwargs.update({
+                'hour': clock_out_hour,
+                'minute': clock_out_minute
+            })
+            
+            self.scheduler.add_job(
             func=self._execute_punch_job,
             trigger=CronTrigger(**cron_kwargs),
             args=[PunchAction.SIGN_OUT],
             id='clock_out_job',
             name='自動簽退',
             replace_existing=True
-        )
+            )
+            
+            # 添加狀態確認訊息任務
+            self.scheduler.add_job(
+                func=self._log_status_message,
+                trigger=IntervalTrigger(seconds=schedule_config.status_message_interval),
+                id='status_message_job',
+                name='定期狀態確認',
+                replace_existing=True
+            )
         
         logger.info(f"已添加排程任務: 簽到 {schedule_config.clock_in_time}, 簽退 {schedule_config.clock_out_time}")
+        logger.info(f"已添加狀態確認任務: 每 {schedule_config.status_message_interval} 秒執行一次")
     
     async def _execute_punch_job(self, action: PunchAction):
         """執行打卡任務"""
@@ -150,7 +164,10 @@ class PunchScheduler:
         
         try:
             # 執行打卡回調
-            result = await self._punch_callback(action)
+            if self._punch_callback:
+                result = await self._punch_callback(action)
+            else:
+                raise ValueError("打卡回調函數未設定")
             
             if result.success:
                 logger.success(f"排程打卡成功: {action.value} - {result.message}")
@@ -159,6 +176,29 @@ class PunchScheduler:
                 
         except Exception as e:
             logger.error(f"執行排程打卡任務時發生錯誤: {e}")
+    
+    async def _log_status_message(self):
+        """定期記錄排程器狀態訊息"""
+        try:
+            status = self.get_job_status()
+            active_jobs = len(status.get('jobs', []))
+            
+            # 計算下次打卡時間
+            next_runs = self.get_next_runs()
+            next_punch_times = []
+            
+            for job_name, next_time in next_runs.items():
+                if job_name in ['自動簽到', '自動簽退'] and next_time:
+                    next_punch_times.append(f"{job_name}: {next_time.strftime('%Y-%m-%d %H:%M:%S')}")
+            
+            logger.info(f"排程器運行狀態確認 - 活躍任務數: {active_jobs}")
+            if next_punch_times:
+                logger.info(f"下次打卡時間: {', '.join(next_punch_times)}")
+            else:
+                logger.info("暫無排程打卡任務")
+                
+        except Exception as e:
+            logger.error(f"記錄狀態訊息時發生錯誤: {e}")
     
     def get_next_runs(self) -> Dict[str, Optional[datetime]]:
         """取得下次執行時間"""
@@ -204,7 +244,7 @@ class PunchScheduler:
         try:
             result = await self._punch_callback(action)
             logger.info(f"手動打卡結果: {result.success}")
-            return result
+            return result  # type: ignore
         except Exception as e:
             logger.error(f"手動打卡失敗: {e}")
             raise
@@ -229,12 +269,15 @@ class SchedulerManager:
     @property
     def scheduler(self) -> PunchScheduler:
         """取得排程器實例"""
+        if self._scheduler is None:
+            raise RuntimeError("排程器尚未初始化")
         return self._scheduler
     
     async def initialize(self, punch_callback: Callable):
         """初始化排程器"""
-        self._scheduler.set_punch_callback(punch_callback)
-        await self._scheduler.start()
+        if self._scheduler:
+            self._scheduler.set_punch_callback(punch_callback)
+            await self._scheduler.start()
     
     async def shutdown(self):
         """關閉排程器"""

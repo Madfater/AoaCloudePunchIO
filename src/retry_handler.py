@@ -3,9 +3,9 @@
 """
 
 import asyncio
-from typing import Any, Callable, Optional, Union, Type, Tuple
+from typing import Any, Callable, Optional, Type
 from functools import wraps
-from datetime import datetime, timedelta
+from datetime import datetime
 from loguru import logger
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 from playwright.async_api import Error as PlaywrightError
@@ -156,7 +156,10 @@ class RetryHandler:
                 await asyncio.sleep(delay)
         
         # 如果所有嘗試都失敗，拋出最後一個錯誤
-        raise last_exception
+        if last_exception:
+            raise last_exception
+        else:
+            raise Exception("所有重試嘗試都失敗，但沒有捕獲到具體錯誤")
 
 
 def retry_on_error(
@@ -211,7 +214,7 @@ class CircuitBreaker:
         
         if self.state == 'OPEN':
             # 檢查是否可以嘗試恢復
-            if (datetime.now() - self.last_failure_time).seconds >= self.recovery_timeout:
+            if self.last_failure_time and (datetime.now() - self.last_failure_time).seconds >= self.recovery_timeout:
                 self.state = 'HALF_OPEN'
                 logger.info("熔斷器進入半開狀態，嘗試恢復")
                 return True

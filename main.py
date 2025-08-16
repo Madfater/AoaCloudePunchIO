@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-震旦HR系統自動打卡主程式
+震旦HR系統自動打卡主程式（整合視覺化測試功能）
 """
 
 import asyncio
@@ -12,10 +12,122 @@ from datetime import datetime
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
 from loguru import logger
-from src.punch_clock import AoaCloudPunchClock
+from src.punch_clock import PunchClockService
 from src.config import config_manager
 from src.models import PunchAction, PunchResult
 from src.scheduler import scheduler_manager
+
+
+def setup_logger(log_level: str = "INFO", log_file: str = None):
+    """設置日誌記錄"""
+    logger.remove()  # 移除默認處理器
+    
+    # 控制台輸出
+    logger.add(
+        sys.stdout,
+        level=log_level,
+        format="<green>{time:HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{message}</cyan>",
+        colorize=True
+    )
+    
+    # 檔案輸出（如果指定）
+    if log_file:
+        logger.add(
+            log_file,
+            level=log_level,
+            format="{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {message}",
+            rotation="1 day",
+            retention="7 days"
+        )
+
+
+# save_test_result_json 函數已移至 PunchClockService
+
+
+async def run_visual_test(args):
+    """執行視覺化測試"""
+    test_type = "真實打卡" if args.real_punch else "模擬"
+    logger.info(f"🎯 視覺化測試模式 - {test_type}")
+    
+    try:
+        # 載入配置
+        config = config_manager.load_config()
+        credentials = config_manager.get_login_credentials()
+        
+        # 確定打卡動作
+        punch_action = None
+        if args.sign_in and args.sign_out:
+            logger.error("❌ 不能同時指定 --sign-in 和 --sign-out")
+            return False
+        elif args.sign_in:
+            punch_action = PunchAction.SIGN_IN
+        elif args.sign_out:
+            punch_action = PunchAction.SIGN_OUT
+        
+        # 顯示測試參數
+        logger.info("🔧 測試配置:")
+        logger.info(f"   測試模式: {test_type}")
+        logger.info(f"   無頭模式: {'否' if args.show_browser else '是'}")
+        logger.info(f"   互動模式: {'是' if args.interactive else '否'}")
+        logger.info(f"   截圖目錄: {args.screenshots_dir}")
+        if punch_action:
+            action_name = "簽到" if punch_action == PunchAction.SIGN_IN else "簽退"
+            logger.info(f"   指定動作: {action_name}")
+        if args.output_json:
+            logger.info(f"   JSON輸出: {args.output_json}")
+        if args.output_html:
+            logger.info(f"   HTML報告: {args.output_html}")
+        
+        if args.real_punch:
+            logger.warning("⚠️ 警告：真實打卡模式已啟用！")
+            logger.info("💡 系統將詢問您確認後才會實際點擊打卡按鈕")
+        
+        # 直接使用 PunchClockService
+        service = PunchClockService(
+            headless=not args.show_browser,
+            enable_screenshots=True,
+            screenshots_dir=args.screenshots_dir,
+            gps_config=config.gps,
+            interactive_mode=args.interactive or args.real_punch  # 真實打卡強制開啟互動模式
+        )
+        
+        # 執行視覺化測試
+        test_result = await service.execute_punch_flow(credentials, punch_action, "visual")
+        
+        # 保存結果
+        if args.output_json:
+            success = service.save_json_report(test_result, Path(args.output_json))
+            if success:
+                logger.info(f"📄 JSON報告已生成: {args.output_json}")
+            else:
+                logger.error("❌ JSON報告生成失敗")
+        
+        # 生成HTML報告
+        if args.output_html:
+            success = service.generate_html_report(test_result, Path(args.output_html))
+            if success:
+                logger.info(f"📄 HTML報告已生成: {args.output_html}")
+            else:
+                logger.error("❌ HTML報告生成失敗")
+        
+        # 顯示最終結果
+        logger.info("🎊 視覺化測試完成!")
+        if test_result.overall_success:
+            if args.real_punch:
+                logger.info("✅ 真實打卡測試成功執行")
+            else:
+                logger.info("✅ 所有測試步驟均成功執行")
+        else:
+            logger.error("❌ 部分測試步驟失敗，請查看詳細報告")
+        
+        return test_result.overall_success
+        
+    except KeyboardInterrupt:
+        logger.warning("⚠️  測試被使用者中斷")
+        return False
+    except Exception as e:
+        logger.error(f"視覺化測試執行異常: {e}")
+        return False
 
 
 async def test_complete_flow(real_punch: bool = False, punch_action: str = None):
@@ -37,143 +149,46 @@ async def test_complete_flow(real_punch: bool = False, punch_action: str = None)
         else:
             logger.info("🔄 模擬測試模式")
         
-        async with AoaCloudPunchClock(headless=True, enable_screenshots=real_punch, gps_config=config.gps) as punch_clock:
-            # 設定交互式模式（如果是真實打卡）
+        # 確定打卡動作
+        action = None
+        if punch_action == "sign_in":
+            action = PunchAction.SIGN_IN
+        elif punch_action == "sign_out":
+            action = PunchAction.SIGN_OUT
+        
+        # 創建打卡服務
+        service = PunchClockService(
+            headless=True,
+            enable_screenshots=real_punch,
+            gps_config=config.gps,
+            interactive_mode=real_punch
+        )
+        
+        # 執行打卡流程
+        mode = "real" if real_punch else "simulate"
+        result = await service.execute_punch_flow(credentials, action, mode)
+        
+        # 顯示結果
+        if result.success:
             if real_punch:
-                punch_clock.set_interactive_mode(True)
-            
-            # 步驟1: 登入
-            logger.info("🔐 執行登入...")
-            login_success = await punch_clock.login(credentials)
-            if not login_success:
-                logger.error("❌ 登入失敗")
-                return False
-            
-            logger.info("✅ 登入成功")
-            
-            # 步驟2: 導航到打卡頁面
-            logger.info("🧭 導航到打卡頁面...")
-            navigation_success = await punch_clock.navigate_to_punch_page()
-            if not navigation_success:
-                logger.error("❌ 導航到打卡頁面失敗")
-                return False
-            
-            logger.info("✅ 成功到達打卡頁面")
-            
-            # 步驟3: 檢查頁面狀態
-            logger.info("🔍 檢查打卡頁面狀態...")
-            page_status = await punch_clock.check_punch_page_status()
-            if page_status.get("error"):
-                logger.error(f"❌ 頁面狀態檢查失敗: {page_status['error']}")
-                return False
-            
-            logger.info("✅ 打卡頁面狀態正常")
-            logger.info(f"   當前時間: {page_status.get('current_date')} {page_status.get('current_time')}")
-            logger.info(f"   GPS地圖: {'✅' if page_status.get('gps_loaded') else '⚠️ 未載入'}")
-            if page_status.get('location_info'):
-                logger.info(f"   定位地址: {page_status.get('location_info')}")
-            logger.info(f"   簽到可用: {page_status.get('sign_in_available')}")
-            logger.info(f"   簽退可用: {page_status.get('sign_out_available')}")
-            
-            # 步驟4: 執行打卡操作（真實或模擬）
-            test_results = []
-            
-            if punch_action:
-                # 執行指定的打卡動作
-                if punch_action == "sign_in":
-                    result = await execute_punch_operation(punch_clock, PunchAction.SIGN_IN, real_punch, page_status)
-                    test_results.append(result)
-                elif punch_action == "sign_out":
-                    result = await execute_punch_operation(punch_clock, PunchAction.SIGN_OUT, real_punch, page_status)
-                    test_results.append(result)
-                else:
-                    logger.error(f"❌ 不支援的打卡動作: {punch_action}")
-                    return False
-            else:
-                # 測試兩種打卡動作
-                if page_status.get('sign_in_available'):
-                    result = await execute_punch_operation(punch_clock, PunchAction.SIGN_IN, real_punch, page_status)
-                    test_results.append(result)
-                
-                if page_status.get('sign_out_available'):
-                    result = await execute_punch_operation(punch_clock, PunchAction.SIGN_OUT, real_punch, page_status)
-                    test_results.append(result)
-                
-                if not test_results:
-                    logger.warning("⚠️ 沒有可用的打卡按鈕進行測試")
-                    return False
-            
-            # 整體成功判斷
-            overall_success = (login_success and navigation_success and 
-                             not page_status.get("error") and 
-                             any(result.success for result in test_results))
-            
-            # 顯示最終結果
-            if real_punch and any(not result.is_simulation for result in test_results):
                 logger.info("🎉 真實打卡操作完成")
-                for result in test_results:
-                    if not result.is_simulation:
-                        status = "✅ 成功" if result.success else "❌ 失敗"
-                        logger.info(f"   {result.action.value}: {status} - {result.message}")
+                logger.info(f"   結果: ✅ 成功 - {result.message}")
+                if result.server_response:
+                    logger.info(f"   系統回應: {result.server_response}")
             else:
                 logger.info("🔄 模擬測試完成")
-            
-            return overall_success
+                logger.info(f"   結果: ✅ 成功 - {result.message}")
+        else:
+            logger.error(f"❌ 操作失敗: {result.message}")
+        
+        return result.success
                 
     except Exception as e:
         logger.error(f"測試過程發生錯誤: {e}")
         return False
 
 
-async def execute_punch_operation(punch_clock, action: PunchAction, real_punch: bool, page_status: dict):
-    """執行打卡操作（真實或模擬）"""
-    action_name = "簽到" if action == PunchAction.SIGN_IN else "簽退"
-    available_key = 'sign_in_available' if action == PunchAction.SIGN_IN else 'sign_out_available'
-    
-    if not page_status.get(available_key, True):
-        logger.warning(f"⚠️ {action_name} 按鈕不可用，跳過測試")
-        return PunchResult(
-            success=False,
-            action=action,
-            timestamp=datetime.now(),
-            message=f"{action_name} 按鈕不可用",
-            is_simulation=True
-        )
-    
-    if real_punch:
-        # 執行真實打卡操作
-        logger.info(f"🎯 準備執行真實 {action_name} 操作...")
-        
-        # 等待用戶確認
-        confirm = await punch_clock.wait_for_punch_confirmation(action)
-        result = await punch_clock.execute_real_punch_action(action, confirm=confirm)
-        
-        if result.is_simulation:
-            logger.info(f"🔄 {action_name} 以模擬模式執行")
-        else:
-            status = "✅ 成功" if result.success else "❌ 失敗"
-            logger.info(f"🚀 真實 {action_name} 結果: {status}")
-            if result.server_response:
-                logger.info(f"   系統回應: {result.server_response}")
-    else:
-        # 執行模擬操作
-        logger.info(f"🎯 模擬 {action_name} 操作...")
-        simulate_success = await punch_clock.simulate_punch_action(action.value)
-        
-        result = PunchResult(
-            success=simulate_success,
-            action=action,
-            timestamp=datetime.now(),
-            message=f"模擬 {action_name} {'成功' if simulate_success else '失敗'}",
-            is_simulation=True
-        )
-        
-        if simulate_success:
-            logger.info(f"✅ {action_name} 模擬成功")
-        else:
-            logger.warning(f"⚠️ {action_name} 模擬失敗")
-    
-    return result
+# execute_punch_operation 函數已經不再需要，由新的 PunchClockService 統一處理
 
 
 async def punch_callback(action: PunchAction) -> PunchResult:
@@ -185,32 +200,17 @@ async def punch_callback(action: PunchAction) -> PunchResult:
         config = config_manager.load_config()
         credentials = config_manager.get_login_credentials()
         
-        async with AoaCloudPunchClock(headless=True, enable_screenshots=True, gps_config=config.gps) as punch_clock:
-            # 登入
-            login_success = await punch_clock.login(credentials)
-            if not login_success:
-                return PunchResult(
-                    success=False,
-                    action=action,
-                    timestamp=datetime.now(),
-                    message="登入失敗",
-                    is_simulation=False
-                )
-            
-            # 導航到打卡頁面
-            navigation_success = await punch_clock.navigate_to_punch_page()
-            if not navigation_success:
-                return PunchResult(
-                    success=False,
-                    action=action,
-                    timestamp=datetime.now(),
-                    message="導航到打卡頁面失敗",
-                    is_simulation=False
-                )
-            
-            # 執行真實打卡操作（排程模式自動確認）
-            result = await punch_clock.execute_real_punch_action(action, confirm=True)
-            return result
+        # 創建打卡服務（排程模式不使用交互式確認）
+        service = PunchClockService(
+            headless=True,
+            enable_screenshots=True,
+            gps_config=config.gps,
+            interactive_mode=False
+        )
+        
+        # 執行真實打卡操作
+        result = await service.execute_punch_flow(credentials, action, "real")
+        return result
             
     except Exception as e:
         logger.error(f"排程打卡過程發生錯誤: {e}")
@@ -273,11 +273,19 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 使用範例:
+  # 基本功能
   python main.py                          # 模擬測試模式
   python main.py --real-punch             # 真實打卡模式（需要確認）
   python main.py --real-punch --sign-in   # 執行真實簽到
   python main.py --real-punch --sign-out  # 執行真實簽退
   python main.py --schedule               # 啟動排程器（自動打卡）
+  
+  # 視覺化測試模式
+  python main.py --visual                                # 基本視覺化測試
+  python main.py --visual --show-browser                # 顯示瀏覽器窗口
+  python main.py --visual --interactive                 # 互動模式
+  python main.py --visual --output-html report.html    # 生成HTML報告
+  python main.py --visual --real-punch --show-browser  # 視覺化真實打卡
         """
     )
     
@@ -305,7 +313,58 @@ def main():
         help='啟動排程器模式（根據配置檔案自動打卡）'
     )
     
+    # 視覺化測試相關參數
+    parser.add_argument(
+        '--visual',
+        action='store_true',
+        help='啟用視覺化測試模式'
+    )
+    
+    parser.add_argument(
+        '--show-browser',
+        action='store_true',
+        help='顯示瀏覽器窗口（非無頭模式）'
+    )
+    
+    parser.add_argument(
+        '--interactive',
+        action='store_true',
+        help='啟用互動模式，在關鍵步驟等待用戶確認'
+    )
+    
+    parser.add_argument(
+        '--screenshots-dir',
+        default='screenshots',
+        help='截圖保存目錄 (預設: screenshots)'
+    )
+    
+    parser.add_argument(
+        '--output-json',
+        help='將測試結果保存為JSON檔案'
+    )
+    
+    parser.add_argument(
+        '--output-html',
+        help='生成HTML視覺化測試報告'
+    )
+    
+    parser.add_argument(
+        '--log-level',
+        choices=['DEBUG', 'INFO', 'WARNING', 'ERROR'],
+        default='INFO',
+        help='日誌等級 (預設: INFO)'
+    )
+    
+    parser.add_argument(
+        '--log-file',
+        help='日誌檔案路徑'
+    )
+    
     args = parser.parse_args()
+    
+    # 設置日誌（如果指定了日誌參數）
+    if hasattr(args, 'log_level') and hasattr(args, 'log_file'):
+        setup_logger(args.log_level, args.log_file)
     
     print("🤖 震旦HR系統自動打卡工具")
     print("=" * 40)
@@ -319,8 +378,8 @@ def main():
     
     # 檢查排程模式
     if args.schedule:
-        if args.real_punch or args.sign_in or args.sign_out:
-            print("❌ 排程模式不能與其他打卡選項同時使用")
+        if args.visual or args.real_punch or args.sign_in or args.sign_out:
+            print("❌ 排程模式不能與其他選項同時使用")
             return
         
         print("🕐 啟動排程器模式")
@@ -329,6 +388,31 @@ def main():
         
         # 運行排程器
         asyncio.run(run_scheduler())
+        return
+    
+    # 檢查視覺化測試模式
+    if args.visual:
+        print("🎯 視覺化測試模式")
+        if args.real_punch:
+            print("⚠️ 真實打卡視覺化測試")
+        else:
+            print("🔄 模擬視覺化測試")
+        print()
+        
+        # 運行視覺化測試
+        success = asyncio.run(run_visual_test(args))
+        if success:
+            print("🎉 視覺化測試完成！")
+        else:
+            print("💥 視覺化測試失敗，請檢查日誌")
+        return
+    
+    # 檢查視覺化參數是否在非視覺化模式下使用
+    visual_only_params = [
+        args.show_browser, args.interactive, args.output_json, args.output_html
+    ]
+    if any(visual_only_params):
+        print("❌ 視覺化參數 (--show-browser, --interactive, --output-json, --output-html) 只能在 --visual 模式下使用")
         return
     
     # 確定要執行的打卡動作
@@ -368,7 +452,7 @@ def main():
             print("🎉 完整打卡流程測試成功！")
             print("💡 注意：這是模擬測試，未實際點擊按鈕")
             print("🚀 如需執行真實打卡，請使用: python main.py --real-punch")
-        print("📋 如需視覺化測試，請使用: uv run python main_visual.py --show-browser")
+        print("📋 如需視覺化測試，請使用: python main.py --visual --show-browser")
     else:
         print("💥 操作失敗，請檢查配置檔案和網路連線狀態")
 

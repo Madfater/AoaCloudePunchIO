@@ -110,7 +110,7 @@ async def analyze_aoacloud_site():
                             text = await elem.inner_text()
                             value = await elem.get_attribute('value')
                             logger.info(f"找到可能的登入按鈕 {i+1}: text='{text}', value='{value}'")
-                except Exception as e:
+                except Exception:
                     # 某些選擇器可能不支援，繼續嘗試其他的
                     continue
             

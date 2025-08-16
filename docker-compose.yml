@@ -28,6 +28,7 @@ services:
     volumes:
       - ./logs:/app/logs                   # 日誌目錄
       - ./screenshots:/app/screenshots     # 截圖目錄
+      - ./.env:/app/.env                   # 環境變數檔案
     
     # 預設執行排程模式
     command: ["uv", "run", "python", "main.py", "--schedule"]
@@ -83,6 +84,7 @@ services:
     volumes:
       - ./logs:/app/logs
       - ./screenshots:/app/screenshots
+      - ./.env:/app/.env                   # 環境變數檔案
     
     # 測試模式命令
     command: ["uv", "run", "python", "main.py"]
@@ -143,9 +145,16 @@ volumes:
 #    - PASSWORD=your_password
 #    - CLOCK_IN_TIME=09:00
 #    - CLOCK_OUT_TIME=18:00
-#    - ... (其他必要變數)
+#    - SCHEDULE_ENABLED=true
+#    - WEEKDAYS_ONLY=true
+#    - GPS_LATITUDE=25.080763
+#    - GPS_LONGITUDE=121.569891
+#    - GPS_ADDRESS=台北市內湖區洲子街101號
+#    - DEBUG=false
+#    - HEADLESS=true
 #
-# 3. docker-compose 會自動載入 .env 檔案
+# 3. 確保 .env 檔案與 docker-compose.yml 在同一目錄
+# 4. docker-compose 會自動載入 .env 檔案並掛載到容器內
 
 # ============================================
 # 生產環境配置建議

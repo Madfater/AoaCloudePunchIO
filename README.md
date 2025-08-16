@@ -27,14 +27,16 @@
 AoaCloudePunchIO/
 ├── src/                    # 核心源碼
 │   ├── __init__.py
-│   ├── punch_clock.py      # 自動化登入和打卡邏輯
+│   ├── punch_clock/        # 打卡服務模組
+│   │   ├── service.py      # 主要服務接口
+│   │   ├── browser.py      # 瀏覽器管理
+│   │   ├── auth.py         # 認證處理
+│   │   └── ...            # 其他專門模組
+│   ├── models/            # 資料模型
 │   ├── config.py          # 設定管理系統
-│   ├── models.py          # 資料模型定義
 │   ├── scheduler.py       # 排程管理系統
-│   ├── retry_handler.py   # 錯誤處理和重試機制
-│   └── visual_test.py     # 視覺化測試系統
-├── main.py               # 主程式入口
-├── main_visual.py        # 視覺化測試工具
+│   └── retry_handler.py   # 錯誤處理和重試機制
+├── main.py               # 主程式入口（包含所有功能）
 ├── .env.example         # 環境變數範例檔案
 ├── Dockerfile           # 容器化設定
 ├── docker-compose.yml   # Docker Compose 設定
@@ -154,15 +156,21 @@ uv run python main_visual.py --show-browser --log-level DEBUG
 ### 使用 Docker Compose（推薦）
 
 ```bash
-# 啟動排程系統
+# 1. 確保 .env 檔案存在並正確設定
+cp .env.example .env
+nano .env  # 編輯環境變數
+
+# 2. 啟動排程系統
 docker-compose up -d
 
-# 查看日誌
+# 3. 查看日誌
 docker-compose logs -f punch-scheduler
 
-# 停止系統
+# 4. 停止系統
 docker-compose down
 ```
+
+**重要**: 確保 `.env` 檔案與 `docker-compose.yml` 在同一目錄，系統會自動將環境變數檔案掛載到容器內。
 
 ### 直接 Docker 部署
 
@@ -281,14 +289,33 @@ await scheduler_manager.initialize(punch_callback)
 status = scheduler_manager.scheduler.get_job_status()
 ```
 
-#### `VisualTestRunner`
-視覺化測試類別
+#### 視覺化測試
+統一的打卡服務接口
 
 ```python
-from src.visual_test import VisualTestRunner
+from src.punch_clock import PunchClockService
+from src.models import LoginCredentials
 
-runner = VisualTestRunner(show_browser=True)
-result = await runner.run_full_test()
+# 創建登入憑證
+credentials = LoginCredentials(
+    company_id="your_company",
+    user_id="your_user", 
+    password="your_password"
+)
+
+# 創建服務並執行視覺化測試
+service = PunchClockService(
+    headless=False,           # 顯示瀏覽器
+    enable_screenshots=True,  # 啟用截圖
+    interactive_mode=True     # 互動模式
+)
+
+# 執行視覺化測試
+result = await service.execute_punch_flow(credentials, None, "visual")
+
+# 生成報告
+service.generate_html_report(result, Path("report.html"))
+service.save_json_report(result, Path("result.json"))
 ```
 
 ## 常見問題排除

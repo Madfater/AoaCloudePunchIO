@@ -107,7 +107,11 @@ src/                    # 核心源碼
 ├── __init__.py         # 模組初始化
 ├── punch_clock.py      # 自動化登入和打卡邏輯
 ├── config.py          # 配置管理系統
-├── models.py          # 資料模型定義（包含視覺化測試模型）
+├── models/            # 資料模型定義（分離架構）
+│   ├── __init__.py     # 統一導出接口
+│   ├── core.py        # 核心打卡相關模型
+│   ├── config.py      # 配置相關模型
+│   └── testing.py     # 測試相關模型
 ├── visual_test.py     # 視覺化測試核心模組
 └── scheduler.py       # 排程管理（待開發）
 
@@ -120,8 +124,7 @@ docs/
     └── login_page_analysis.png # 頁面截圖
 
 .env                   # 實際環境變數設定檔（基於 .env.example）
-main.py               # 純粹的主程式入口點（僅基本登入測試）
-main_visual.py        # 專門的視覺化測試工具
+main.py               # 統一主程式入口點（整合所有功能）
 ```
 
 #### 開發原則
@@ -165,9 +168,9 @@ main_visual.py        # 專門的視覺化測試工具
 - 測試前務必確認網站結構未變更
 
 **視覺化測試**:
-- 使用 `uv run python main_visual.py --show-browser` 觀看自動化過程
-- 使用 `uv run python main_visual.py --interactive` 進行互動式測試
-- 使用 `uv run python main_visual.py --output-html report.html` 生成測試報告
+- 使用 `uv run python main.py --visual --show-browser` 觀看自動化過程
+- 使用 `uv run python main.py --visual --interactive` 進行互動式測試
+- 使用 `uv run python main.py --visual --output-html report.html` 生成測試報告
 
 #### 部署考量
 - 支援 Docker 容器化部署
@@ -201,23 +204,27 @@ main_visual.py        # 專門的視覺化測試工具
 #### 主要檔案功能說明
 - **src/punch_clock.py**: 包含 `AoaCloudPunchClock` 類別，實現網站自動化邏輯和截圖功能
 - **src/config.py**: 使用 Pydantic 和環境變數進行配置驗證和管理
-- **src/models.py**: 定義專案相關的資料模型，包含視覺化測試模型
+- **src/models/**: 分離式資料模型架構，包含核心、配置、測試相關模型
 - **src/visual_test.py**: 視覺化測試執行器，支援截圖、報告生成、互動模式
-- **main.py**: 純粹的主程式入口（僅基本登入測試）
-- **main_visual.py**: 專門的視覺化測試工具，提供完整的測試功能
+- **main.py**: 統一程式入口點，整合所有功能（基本打卡、視覺化測試、排程器）
 
-#### 程式分離架構設計
-**關注點分離**:
-- `main.py`: 專注核心自動打卡功能，保持簡潔
-- `main_visual.py`: 專注測試和診斷功能，提供豐富的視覺化選項
+#### 統一入口架構設計
+**功能整合**:
+- `main.py`: 統一所有功能的主入口點，支援基本打卡、視覺化測試、排程器模式
 
 **命令使用方式**:
 ```bash
-# 生產使用 - 基本自動打卡
-uv run python main.py
+# 基本功能
+uv run python main.py                          # 模擬測試
+uv run python main.py --real-punch             # 真實打卡
+uv run python main.py --schedule               # 排程器模式
 
-# 開發測試 - 視覺化測試工具
-uv run python main_visual.py --show-browser --interactive --output-html report.html
+# 視覺化測試
+uv run python main.py --visual                                # 基本視覺化測試
+uv run python main.py --visual --show-browser                 # 顯示瀏覽器
+uv run python main.py --visual --interactive                  # 互動模式
+uv run python main.py --visual --output-html report.html     # 生成報告
+uv run python main.py --visual --real-punch --show-browser   # 視覺化真實打卡
 ```
 
 ## Memories

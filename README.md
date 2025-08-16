@@ -121,7 +121,7 @@ HEADLESS=true
 uv run python main.py
 
 # 視覺化測試（顯示瀏覽器）
-uv run python main_visual.py --show-browser --interactive
+uv run python main.py --visual --show-browser --interactive
 ```
 
 ### 實際打卡
@@ -142,13 +142,13 @@ uv run python main.py --schedule
 ### 視覺化測試選項
 ```bash
 # 生成HTML測試報告
-uv run python main_visual.py --output-html report.html
+uv run python main.py --visual --output-html report.html
 
 # 互動式測試（顯示瀏覽器）
-uv run python main_visual.py --interactive --show-browser
+uv run python main.py --visual --interactive --show-browser
 
 # 除錯模式
-uv run python main_visual.py --show-browser --log-level DEBUG
+uv run python main.py --visual --show-browser --log-level DEBUG
 ```
 
 ## 使用 Docker 部署

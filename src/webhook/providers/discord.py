@@ -133,14 +133,6 @@ class DiscordWebhookProvider(WebhookProvider):
             "text": f"震旦HR打卡系統 • {message.level.value.upper()}"
         }
         
-        # 可在未來添加縮圖支援
-        # thumbnail_map = {
-        #     NotificationLevel.SUCCESS: "✅",
-        #     NotificationLevel.WARNING: "⚠️", 
-        #     NotificationLevel.ERROR: "❌",
-        #     NotificationLevel.INFO: "ℹ️"
-        # }
-        
         # 建立 payload
         return DiscordWebhookPayload(
             embeds=[embed],

@@ -172,6 +172,40 @@ docker-compose down
 
 **重要**: 確保 `.env` 檔案與 `docker-compose.yml` 在同一目錄，系統會自動將環境變數檔案掛載到容器內。
 
+### Docker 權限問題解決
+
+如果在 Docker 容器中遇到截圖或日誌寫入權限問題，請嘗試以下解決方案：
+
+#### 方案 1: 設定正確的用戶 ID（推薦）
+```bash
+# Linux/macOS 系統
+export USER_ID=$(id -u) 
+export GROUP_ID=$(id -g)
+docker-compose up -d --build
+```
+
+#### 方案 2: 修正宿主機目錄權限
+```bash
+# 給予截圖和日誌目錄適當權限
+sudo chmod 777 ./screenshots ./logs
+docker-compose up -d
+```
+
+#### 方案 3: 檢查權限狀態
+```bash
+# 運行權限檢查工具
+docker-compose run --rm punch-test /app/check_permissions.sh
+
+# 或直接運行權限檢查腳本
+./scripts/check_permissions.sh
+```
+
+#### 方案 4: 使用 root 模式（不推薦用於生產環境）
+在 `docker-compose.yml` 中註釋掉以下行：
+```yaml
+# user: "${USER_ID:-1000}:${GROUP_ID:-1000}"
+```
+
 ### 直接 Docker 部署
 
 ```bash
@@ -337,8 +371,40 @@ service.save_json_report(result, Path("result.json"))
 
 3. **Docker 權限問題**
    ```bash
-   # 修正檔案權限
-   sudo chown -R 1000:1000 logs/ screenshots/
+   # 方案1: 設定正確的用戶 ID（推薦）
+   export USER_ID=$(id -u) && export GROUP_ID=$(id -g)
+   docker-compose up -d --build
+   
+   # 方案2: 修正目錄權限
+   sudo chmod 777 ./screenshots ./logs
+   
+   # 方案3: 使用權限檢查工具
+   ./scripts/check_permissions.sh
+   docker-compose run --rm punch-test /app/check_permissions.sh
+   
+   # 方案4: 檢查容器內權限狀態
+   docker-compose exec punch-scheduler ls -la /app/
+   ```
+
+4. **截圖功能失敗**
+   ```bash
+   # 檢查瀏覽器權限和共享記憶體
+   docker-compose logs punch-scheduler | grep "permission\|shm\|screenshot"
+   
+   # 增加共享記憶體大小（在 docker-compose.yml 中）
+   shm_size: '2gb'
+   ```
+
+5. **容器啟動失敗**
+   ```bash
+   # 檢查容器啟動日誌
+   docker-compose logs punch-scheduler
+   
+   # 檢查權限和掛載點
+   docker-compose run --rm punch-test /app/check_permissions.sh
+   
+   # 除錯模式啟動
+   docker-compose run --rm punch-test bash
    ```
 
 ## 安全性注意事項

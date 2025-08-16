@@ -1,8 +1,6 @@
 # Docker Compose 配置檔案
 # 震旦HR系統自動打卡服務
 
-version: '3.8'
-
 services:
   # 主要的自動打卡服務
   punch-scheduler:
@@ -10,9 +8,20 @@ services:
       context: .
       dockerfile: Dockerfile
       target: runtime
-    image: aoacloud-punch:latest
-    container_name: aoacloud-punch-scheduler
+      args:
+        USER_ID: ${USER_ID:-1000}
+        GROUP_ID: ${GROUP_ID:-1000}
+    image: aoacloude-punch:latest
+    container_name: aoacloude-punch-scheduler
     restart: unless-stopped
+    
+    # 用戶和安全設置
+    user: "${USER_ID:-1000}:${GROUP_ID:-1000}"
+    cap_add:
+      - SYS_ADMIN  # 瀏覽器執行需要的權限
+    security_opt:
+      - seccomp:unconfined  # 允許瀏覽器系統調用
+    shm_size: '2gb'  # 瀏覽器共享記憶體大小
     
     # 環境變數配置
     environment:
@@ -30,8 +39,8 @@ services:
       - ./screenshots:/app/screenshots     # 截圖目錄
       - ./.env:/app/.env                   # 環境變數檔案
     
-    # 預設執行排程模式
-    command: ["uv", "run", "python", "main.py", "--schedule"]
+    # 預設執行排程模式（先檢查權限）
+    command: ["sh", "-c", "/app/check_permissions.sh && uv run python main.py --schedule"]
     
     # 健康檢查
     healthcheck:
@@ -68,9 +77,20 @@ services:
       context: .
       dockerfile: Dockerfile
       target: runtime
-    image: aoacloud-punch:latest
-    container_name: aoacloud-punch-test
+      args:
+        USER_ID: ${USER_ID:-1000}
+        GROUP_ID: ${GROUP_ID:-1000}
+    image: aoacloude-punch:latest
+    container_name: aoacloude-punch-test
     profiles: ["test"]  # 僅在 test profile 時啟動
+    
+    # 用戶和安全設置
+    user: "${USER_ID:-1000}:${GROUP_ID:-1000}"
+    cap_add:
+      - SYS_ADMIN
+    security_opt:
+      - seccomp:unconfined
+    shm_size: '2gb'
     
     environment:
       - TZ=Asia/Taipei
@@ -86,8 +106,8 @@ services:
       - ./screenshots:/app/screenshots
       - ./.env:/app/.env                   # 環境變數檔案
     
-    # 測試模式命令
-    command: ["uv", "run", "python", "main.py"]
+    # 測試模式命令（先檢查權限）
+    command: ["sh", "-c", "/app/check_permissions.sh && uv run python main.py"]
     
     # 測試服務不需要自動重啟
     restart: "no"
@@ -131,6 +151,13 @@ volumes:
 
 # 8. 執行一次性測試:
 #    docker-compose run --rm punch-test uv run python main.py --real-punch --sign-in
+#
+# 9. 檢查權限問題:
+#    docker-compose run --rm punch-test /app/check_permissions.sh
+#
+# 10. 設定正確的用戶權限（Linux/macOS）:
+#     export USER_ID=$(id -u) && export GROUP_ID=$(id -g)
+#     docker-compose up -d --build
 
 # ============================================
 # 環境變數配置說明
@@ -165,3 +192,23 @@ volumes:
 # 3. 配置日誌輪轉
 # 4. 設定監控和告警
 # 5. 使用外部配置管理（如 Kubernetes ConfigMap）
+
+# ============================================
+# 權限問題解決指南
+# ============================================
+#
+# 如果遇到截圖權限問題，請嘗試以下解決方案：
+#
+# 方案1：設定正確的用戶 ID（推薦）
+# export USER_ID=$(id -u) 
+# export GROUP_ID=$(id -g)
+# docker-compose up -d --build
+#
+# 方案2：使用 root 模式（簡單但較不安全）
+# 在 docker-compose.yml 中註釋掉 user 行
+#
+# 方案3：修正宿主機目錄權限
+# sudo chmod 777 ./screenshots ./logs
+#
+# 方案4：檢查權限狀態
+# docker-compose run --rm punch-test /app/check_permissions.sh

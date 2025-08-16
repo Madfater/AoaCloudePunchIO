@@ -88,9 +88,11 @@ RUN apt-get update && apt-get install -y \
 ENV TZ=Asia/Taipei
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
-# 建立非 root 使用者
-RUN groupadd --gid 1000 appuser && \
-    useradd --uid 1000 --gid appuser --shell /bin/bash --create-home appuser
+# 建立非 root 使用者（使用可配置的 UID/GID）
+ARG USER_ID=1000
+ARG GROUP_ID=1000
+RUN groupadd --gid ${GROUP_ID} appuser && \
+    useradd --uid ${USER_ID} --gid appuser --shell /bin/bash --create-home appuser
 
 # 設定工作目錄
 WORKDIR /app
@@ -102,6 +104,10 @@ ENV PATH="/root/.local/bin:$PATH"
 # 複製應用程式代碼
 COPY --chown=appuser:appuser . .
 
+# 複製權限檢查腳本
+COPY --chown=appuser:appuser scripts/check_permissions.sh /app/check_permissions.sh
+RUN chmod +x /app/check_permissions.sh
+
 # 從建構階段複製虛擬環境並設定正確的擁有者
 COPY --from=builder --chown=appuser:appuser /app/.venv /app/.venv
 
@@ -110,7 +116,9 @@ RUN /root/.local/bin/uv run playwright install-deps chromium
 
 # 建立必要的目錄並設定權限
 RUN mkdir -p /app/screenshots /app/logs && \
-    chown -R appuser:appuser /app
+    chown -R appuser:appuser /app && \
+    chmod -R 755 /app && \
+    chmod -R 777 /app/screenshots /app/logs
 
 # 切換到非 root 使用者
 USER appuser
@@ -121,6 +129,7 @@ ENV PATH="/home/appuser/.local/bin:$PATH"
 
 # 作為 appuser 安裝 Playwright 瀏覽器
 RUN uv run playwright install chromium
+
 
 # 健康檢查
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
@@ -142,8 +151,8 @@ LABEL maintainer="震旦HR自動打卡系統" \
       uv.version="latest"
 
 # 建構指令範例:
-# docker build -t aoacloud-punch:latest .
-# docker run -d --name punch-scheduler --env-file .env aoacloud-punch:latest
+# docker build -t aoacloude-punch:latest .
+# docker run -d --name punch-scheduler --env-file .env aoacloude-punch:latest
 
 # 開發模式:
-# docker run -it --rm -v $(pwd):/app aoacloud-punch:latest bash
+# docker run -it --rm -v $(pwd):/app aoacloude-punch:latest bash

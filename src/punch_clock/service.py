@@ -10,7 +10,8 @@ from pathlib import Path
 from typing import Optional, Union
 from loguru import logger
 
-from src.models import LoginCredentials, PunchAction, PunchResult, GPSConfig, VisualTestResult, TestStep, ScreenshotInfo
+from src.models import LoginCredentials, PunchAction, PunchResult, GPSConfig, VisualTestResult, TestStep, ScreenshotInfo, WebhookConfig
+from src.webhook import WebhookManager
 from .browser import BrowserManager
 from .auth import AuthHandler
 from .navigation import NavigationHandler
@@ -24,12 +25,21 @@ class PunchClockService:
     
     def __init__(self, headless: bool = True, enable_screenshots: bool = False, 
                  screenshots_dir: str = "screenshots", gps_config: Optional[GPSConfig] = None,
-                 interactive_mode: bool = False):
+                 interactive_mode: bool = False, webhook_config: Optional[WebhookConfig] = None):
         self.headless = headless
         self.enable_screenshots = enable_screenshots
         self.screenshots_dir = screenshots_dir
         self.gps_config = gps_config or GPSConfig()
         self.interactive_mode = interactive_mode
+        
+        # Webhook 管理器
+        self.webhook_manager: Optional[WebhookManager] = None
+        if webhook_config:
+            try:
+                self.webhook_manager = WebhookManager(webhook_config)
+                logger.info(f"Webhook 管理器已初始化，可用提供者: {self.webhook_manager.available_providers}")
+            except Exception as e:
+                logger.error(f"初始化 Webhook 管理器失敗: {e}")
         
         # 管理器實例（初始化時為None）
         self.browser_manager: Optional[BrowserManager] = None
@@ -198,10 +208,16 @@ class PunchClockService:
         if real_punch:
             # 等待用戶確認
             confirm = await self.punch_executor.wait_for_punch_confirmation(action)
-            return await self.punch_executor.execute_punch_action(action, True, confirm)
+            result = await self.punch_executor.execute_punch_action(action, True, confirm)
         else:
             # 模擬模式
-            return await self.punch_executor.execute_punch_action(action, False, False)
+            result = await self.punch_executor.execute_punch_action(action, False, False)
+        
+        # 發送 webhook 通知（僅在真實打卡模式下）
+        if real_punch and self.webhook_manager:
+            await self._send_punch_notification(result)
+        
+        return result
     
     async def _execute_available_actions(self, page_status: dict, real_punch: bool) -> PunchResult:
         """執行所有可用的打卡動作（僅模擬模式）"""
@@ -581,6 +597,124 @@ class PunchClockService:
         
         logger.info("打卡服務初始化完成")
         return self
+    
+    async def _send_punch_notification(self, punch_result: PunchResult):
+        """發送打卡結果通知
+        
+        Args:
+            punch_result: 打卡操作結果
+        """
+        if not self.webhook_manager or not self.webhook_manager.is_enabled:
+            return
+        
+        try:
+            # 準備動作名稱
+            action_name = "簽到" if punch_result.action == PunchAction.SIGN_IN else "簽退"
+            
+            # 準備詳細資訊
+            details = {
+                "動作": action_name,
+                "時間": punch_result.timestamp.strftime("%Y-%m-%d %H:%M:%S"),
+                "模式": "模擬" if punch_result.is_simulation else "真實"
+            }
+            
+            # 添加伺服器回應（如果有）
+            if hasattr(punch_result, 'server_response') and punch_result.server_response:
+                details["系統回應"] = punch_result.server_response
+            
+            # 準備截圖列表
+            screenshots = []
+            if self.enable_screenshots:
+                # 收集最新的截圖檔案
+                screenshots_dir = Path(self.screenshots_dir)
+                if screenshots_dir.exists():
+                    recent_screenshots = list(screenshots_dir.glob("*.png"))
+                    # 按修改時間排序，取最新的幾張
+                    recent_screenshots.sort(key=lambda x: x.stat().st_mtime, reverse=True)
+                    screenshots = [str(f) for f in recent_screenshots[:3]]  # 最多3張截圖
+            
+            # 發送通知
+            logger.info(f"發送 {action_name} webhook 通知...")
+            responses = await self.webhook_manager.send_punch_notification(
+                action=action_name,
+                success=punch_result.success,
+                result_message=punch_result.message,
+                details=details,
+                screenshots=screenshots
+            )
+            
+            # 記錄結果
+            successful_providers = [r.provider for r in responses if r.success]
+            failed_providers = [r.provider for r in responses if not r.success]
+            
+            if successful_providers:
+                logger.info(f"Webhook 通知發送成功: {', '.join(successful_providers)}")
+            if failed_providers:
+                logger.warning(f"Webhook 通知發送失敗: {', '.join(failed_providers)}")
+                
+        except Exception as e:
+            logger.error(f"發送 webhook 通知時發生錯誤: {e}")
+    
+    async def send_scheduler_notification(self, event: str, message: str, details: dict = None):
+        """發送排程器事件通知
+        
+        Args:
+            event: 事件類型 ("啟動", "停止", "錯誤" 等)
+            message: 訊息內容
+            details: 額外詳細資訊
+        """
+        if not self.webhook_manager or not self.webhook_manager.is_enabled:
+            return
+        
+        try:
+            logger.info(f"發送排程器 {event} webhook 通知...")
+            responses = await self.webhook_manager.send_scheduler_notification(
+                event=event,
+                message_text=message,
+                details=details or {}
+            )
+            
+            # 記錄結果
+            successful_providers = [r.provider for r in responses if r.success]
+            if successful_providers:
+                logger.info(f"排程器通知發送成功: {', '.join(successful_providers)}")
+            else:
+                logger.warning("排程器通知發送失敗")
+                
+        except Exception as e:
+            logger.error(f"發送排程器 webhook 通知時發生錯誤: {e}")
+    
+    async def test_webhook_notifications(self):
+        """測試 webhook 通知功能
+        
+        Returns:
+            bool: 測試是否成功
+        """
+        if not self.webhook_manager:
+            logger.warning("Webhook 管理器未初始化，無法測試")
+            return False
+        
+        if not self.webhook_manager.is_enabled:
+            logger.warning("Webhook 功能未啟用，無法測試")
+            return False
+        
+        try:
+            logger.info("開始測試 webhook 通知...")
+            responses = await self.webhook_manager.test_webhooks()
+            
+            success_count = sum(1 for r in responses if r.success)
+            total_count = len(responses)
+            
+            if success_count == total_count and total_count > 0:
+                logger.info(f"Webhook 測試成功 ({success_count}/{total_count})")
+                return True
+            else:
+                logger.error(f"Webhook 測試失敗 ({success_count}/{total_count})")
+                return False
+                
+        except Exception as e:
+            logger.error(f"Webhook 測試時發生錯誤: {e}")
+            return False
     
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         """異步上下文管理器退出"""

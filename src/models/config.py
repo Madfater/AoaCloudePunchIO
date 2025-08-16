@@ -4,6 +4,7 @@
 
 from pydantic import BaseModel
 from .core import LoginCredentials
+from .webhook import WebhookConfig
 
 
 class GPSConfig(BaseModel):
@@ -27,5 +28,6 @@ class AppConfig(BaseModel):
     login: LoginCredentials
     schedule: ScheduleConfig
     gps: GPSConfig = GPSConfig()  # GPS 設定，使用預設值
+    webhook: WebhookConfig = WebhookConfig()  # Webhook 設定，使用預設值
     debug: bool = False
     headless: bool = True

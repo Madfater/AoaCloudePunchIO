@@ -88,6 +88,7 @@ async def run_visual_test(args):
             enable_screenshots=True,
             screenshots_dir=args.screenshots_dir,
             gps_config=config.gps,
+            webhook_config=config.webhook,
             interactive_mode=args.interactive or args.real_punch  # 真實打卡強制開啟互動模式
         )
         
@@ -161,6 +162,7 @@ async def test_complete_flow(real_punch: bool = False, punch_action: str = None)
             headless=True,
             enable_screenshots=real_punch,
             gps_config=config.gps,
+            webhook_config=config.webhook,
             interactive_mode=real_punch
         )
         
@@ -205,6 +207,7 @@ async def punch_callback(action: PunchAction) -> PunchResult:
             headless=True,
             enable_screenshots=True,
             gps_config=config.gps,
+            webhook_config=config.webhook,
             interactive_mode=False
         )
         
@@ -263,6 +266,90 @@ async def run_scheduler():
         logger.info("📴 排程器已停止")
 
 
+async def test_webhook_functionality():
+    """測試 webhook 通知功能"""
+    logger.info("🧪 開始測試 webhook 通知功能...")
+    
+    try:
+        # 載入配置
+        config = config_manager.load_config()
+        
+        # 檢查 webhook 是否已啟用
+        if not config.webhook.enabled:
+            logger.warning("⚠️ Webhook 功能未啟用，請在 .env 中設定 WEBHOOK_ENABLED=true")
+            print("💡 要啟用 webhook 功能，請設定以下環境變數:")
+            print("   WEBHOOK_ENABLED=true")
+            print("   DISCORD_WEBHOOK_URL=<你的 Discord webhook URL>")
+            return
+        
+        # 檢查是否有配置的 webhook URL
+        has_webhooks = any([
+            config.webhook.discord_url,
+            config.webhook.slack_url,
+            config.webhook.teams_url
+        ])
+        
+        if not has_webhooks:
+            logger.warning("⚠️ 未找到任何 webhook URL 配置")
+            print("💡 請在 .env 中設定至少一個 webhook URL:")
+            print("   DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/...")
+            return
+        
+        logger.info("✅ Webhook 配置檢查通過")
+        
+        # 顯示配置資訊
+        logger.info(f"📋 Webhook 配置資訊:")
+        logger.info(f"   啟用狀態: {'是' if config.webhook.enabled else '否'}")
+        if config.webhook.discord_url:
+            logger.info(f"   Discord: 已配置")
+        if config.webhook.slack_url:
+            logger.info(f"   Slack: 已配置（未來支援）")
+        if config.webhook.teams_url:
+            logger.info(f"   Teams: 已配置（未來支援）")
+        
+        logger.info(f"   通知設定:")
+        logger.info(f"     成功通知: {'是' if config.webhook.notify_success else '否'}")
+        logger.info(f"     失敗通知: {'是' if config.webhook.notify_failure else '否'}")
+        logger.info(f"     排程通知: {'是' if config.webhook.notify_scheduler else '否'}")
+        logger.info(f"     錯誤通知: {'是' if config.webhook.notify_errors else '否'}")
+        
+        # 創建 PunchClockService 來測試 webhook
+        service = PunchClockService(
+            headless=True,
+            enable_screenshots=False,
+            webhook_config=config.webhook
+        )
+        
+        # 執行 webhook 測試
+        logger.info("🔄 執行 webhook 連線測試...")
+        success = await service.test_webhook_notifications()
+        
+        if success:
+            logger.info("🎉 Webhook 測試成功！")
+            print("✅ 所有配置的 webhook 都能正常連線和發送訊息")
+            
+            # 發送額外的測試通知
+            logger.info("📤 發送測試打卡通知...")
+            await service.send_scheduler_notification(
+                "測試",
+                "這是一條測試訊息，用於驗證打卡系統的 webhook 通知功能正常運作。",
+                {"測試時間": datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+            )
+            
+        else:
+            logger.error("❌ Webhook 測試失敗")
+            print("💥 請檢查 webhook URL 配置和網路連線")
+            print("📋 常見問題:")
+            print("   1. 確認 Discord webhook URL 格式正確")
+            print("   2. 確認網路連線正常")
+            print("   3. 確認 Discord 伺服器 webhook 仍然有效")
+        
+    except Exception as e:
+        logger.error(f"Webhook 測試過程發生錯誤: {e}")
+        print(f"💥 測試失敗: {e}")
+        print("📋 請檢查配置檔案和錯誤日誌")
+
+
 def main():
     """主程式入口"""
     import argparse
@@ -286,6 +373,9 @@ def main():
   python main.py --visual --interactive                 # 互動模式
   python main.py --visual --output-html report.html    # 生成HTML報告
   python main.py --visual --real-punch --show-browser  # 視覺化真實打卡
+  
+  # Webhook 測試
+  python main.py --test-webhook                          # 測試 webhook 連線
         """
     )
     
@@ -311,6 +401,12 @@ def main():
         '--schedule',
         action='store_true',
         help='啟動排程器模式（根據配置檔案自動打卡）'
+    )
+    
+    parser.add_argument(
+        '--test-webhook',
+        action='store_true',
+        help='測試 webhook 通知功能'
     )
     
     # 視覺化測試相關參數
@@ -374,6 +470,20 @@ def main():
         print("⚠️  未找到環境變數檔案，請建立 .env 檔案")
         print("📝 請複製 .env.example 為 .env 並填入您的資訊：")
         print("   cp .env.example .env")
+        return
+    
+    # 檢查 webhook 測試模式
+    if args.test_webhook:
+        if args.visual or args.real_punch or args.sign_in or args.sign_out or args.schedule:
+            print("❌ Webhook 測試模式不能與其他選項同時使用")
+            return
+        
+        print("🧪 Webhook 通知測試模式")
+        print("💡 系統將測試所有已配置的 webhook 連線")
+        print()
+        
+        # 運行 webhook 測試
+        asyncio.run(test_webhook_functionality())
         return
     
     # 檢查排程模式

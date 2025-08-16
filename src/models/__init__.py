@@ -25,6 +25,17 @@ from .testing import (
     VisualTestResult,
 )
 
+# 從 webhook 模組導入 webhook 相關模型
+from .webhook import (
+    WebhookType,
+    NotificationLevel,
+    WebhookConfig,
+    WebhookMessage,
+    WebhookResponse,
+    DiscordEmbed,
+    DiscordWebhookPayload,
+)
+
 # 定義可公開導出的所有模型
 __all__ = [
     # 核心模型
@@ -40,4 +51,12 @@ __all__ = [
     "ScreenshotInfo",
     "TestStep",
     "VisualTestResult",
+    # Webhook 模型
+    "WebhookType",
+    "NotificationLevel", 
+    "WebhookConfig",
+    "WebhookMessage",
+    "WebhookResponse",
+    "DiscordEmbed",
+    "DiscordWebhookPayload",
 ]

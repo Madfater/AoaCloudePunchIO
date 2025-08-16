@@ -202,7 +202,7 @@ main.py               # 統一主程式入口點（整合所有功能）
 - ❌ 完整的部署文檔
 
 #### 主要檔案功能說明
-- **src/punch_clock.py**: 包含 `AoaCloudPunchClock` 類別，實現網站自動化邏輯和截圖功能
+- **src/punch_clock/**: 模組化打卡服務，包含 `PunchClockService` 主要服務接口，實現網站自動化邏輯和截圖功能
 - **src/config.py**: 使用 Pydantic 和環境變數進行配置驗證和管理
 - **src/models/**: 分離式資料模型架構，包含核心、配置、測試相關模型
 - **src/visual_test.py**: 視覺化測試執行器，支援截圖、報告生成、互動模式

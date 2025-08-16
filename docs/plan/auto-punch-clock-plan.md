@@ -25,7 +25,7 @@
 
 ### 第二階段：核心功能開發 ✅
 - [✅] 實現基本的網頁自動化邏輯 (登入功能)
-- [✅] 建立 AoaCloudPunchClock 主要類別
+- [✅] 建立 PunchClockService 主要服務類別
 - [✅] 實現打卡頁面導航和打卡功能邏輯 (簽到/簽退模擬)
 - [✅] 建立配置管理系統 (config.py)
 - [✅] 建立資料模型系統 (models.py)
@@ -84,7 +84,7 @@
 - [✅] 依賴安裝
 
 ### 開發階段 ✅
-- [✅] 登入邏輯實現 (AoaCloudPunchClock.login)
+- [✅] 登入邏輯實現 (PunchClockService.execute_punch_flow)
 - [✅] 基礎自動化框架建立
 - [✅] 配置系統完成 (ConfigManager類別)
 - [✅] 資料模型定義 (models.py，包含視覺化測試模型)
@@ -119,7 +119,7 @@
 **已完成的檔案：**
 - ✅ `pyproject.toml` - UV專案配置
 - ✅ `uv.lock` - 鎖定版本檔案
-- ✅ `src/punch_clock.py` - 主要打卡邏輯 (AoaCloudPunchClock類別)
+- ✅ `src/punch_clock/` - 模組化打卡服務 (PunchClockService主要服務接口)
 - ✅ `src/config.py` - 配置管理 (ConfigManager類別with Pydantic)
 - ✅ `src/models.py` - 資料模型定義（包含視覺化測試模型）
 - ✅ `src/visual_test.py` - 視覺化測試核心模組

@@ -290,7 +290,7 @@ print('✅ 配置系統正常')
 uv run python -c "
 import sys
 sys.path.insert(0, 'src')
-from punch_clock import AoaCloudPunchClock
+from punch_clock import PunchClockService
 from scheduler import scheduler_manager
 from models import PunchAction
 print('✅ 模組載入正常')
@@ -301,16 +301,18 @@ print('✅ 模組載入正常')
 
 ### 核心類別
 
-#### `AoaCloudPunchClock`
-核心打卡自動化類別
+#### `PunchClockService`
+核心打卡自動化服務
 
 ```python
-from src.punch_clock import AoaCloudPunchClock
+from src.punch_clock import PunchClockService
 
-async with AoaCloudPunchClock(headless=True) as clock:
-    await clock.login(credentials)
-    await clock.navigate_to_punch_page()
-    result = await clock.execute_real_punch_action(action)
+async with PunchClockService(headless=True) as service:
+    result = await service.execute_punch_flow(
+        credentials=credentials,
+        action=action,
+        mode="real"  # 或 "simulate" 或 "visual"
+    )
 ```
 
 #### `PunchScheduler`

@@ -78,7 +78,7 @@ jobs:
         uv run python -c "
         import sys
         sys.path.insert(0, 'src')
-        from punch_clock import AoaCloudPunchClock
+        from punch_clock import PunchClockService
         from scheduler import scheduler_manager
         from models import PunchAction
         print('✅ 模組載入正常')

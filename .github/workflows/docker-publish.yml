@@ -63,7 +63,23 @@ jobs:
     - name: 基本功能測試
       run: |
         # 建立測試環境變數檔案
-        cp .env.example .env
+        cat > .env << 'EOF'
+        # CI 測試環境變數
+        COMPANY_ID=test_company
+        USER_ID=test_user
+        PASSWORD=test_password
+        CLOCK_IN_TIME=09:00
+        CLOCK_OUT_TIME=18:00
+        SCHEDULE_ENABLED=false
+        WEEKDAYS_ONLY=true
+        STATUS_MESSAGE_INTERVAL=300
+        GPS_LATITUDE=25.1
+        GPS_LONGITUDE=121.5
+        GPS_ADDRESS=台北市
+        DEBUG=false
+        HEADLESS=true
+        WEBHOOK_ENABLED=false
+        EOF
         
         # 測試配置載入
         uv run python -c "

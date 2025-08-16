@@ -11,7 +11,7 @@ services:
       args:
         USER_ID: ${USER_ID:-1000}
         GROUP_ID: ${GROUP_ID:-1000}
-    image: aoacloude-punch:latest
+    image: ghcr.io/madfater/aoacloudepunchio:latest
     container_name: aoacloude-punch-scheduler
     restart: unless-stopped
     
@@ -40,7 +40,7 @@ services:
       - ./.env:/app/.env                   # 環境變數檔案
     
     # 預設執行排程模式（先檢查權限）
-    command: ["sh", "-c", "/app/check_permissions.sh && uv run python main.py --schedule"]
+    command: ["sh", "-c", "/app/scripts/check_permissions.sh && uv run python main.py --schedule"]
     
     # 健康檢查
     healthcheck:
@@ -107,7 +107,7 @@ services:
       - ./.env:/app/.env                   # 環境變數檔案
     
     # 測試模式命令（先檢查權限）
-    command: ["sh", "-c", "/app/check_permissions.sh && uv run python main.py"]
+    command: ["sh", "-c", "/app/scripts/check_permissions.sh && uv run python main.py"]
     
     # 測試服務不需要自動重啟
     restart: "no"

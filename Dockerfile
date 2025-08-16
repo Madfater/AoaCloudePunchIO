@@ -105,8 +105,9 @@ ENV PATH="/root/.local/bin:$PATH"
 COPY --chown=appuser:appuser . .
 
 # 複製權限檢查腳本
-COPY --chown=appuser:appuser scripts/check_permissions.sh /app/check_permissions.sh
-RUN chmod +x /app/check_permissions.sh
+RUN mkdir -p /app/scripts
+COPY --chown=appuser:appuser scripts/check_permissions.sh /app/scripts/check_permissions.sh
+RUN chmod +x /app/scripts/check_permissions.sh
 
 # 從建構階段複製虛擬環境並設定正確的擁有者
 COPY --from=builder --chown=appuser:appuser /app/.venv /app/.venv

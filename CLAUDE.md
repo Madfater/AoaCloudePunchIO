@@ -112,7 +112,7 @@ src/                    # 核心源碼
 │   ├── core.py        # 核心打卡相關模型
 │   ├── config.py      # 配置相關模型
 │   └── testing.py     # 測試相關模型
-├── visual_test.py     # 視覺化測試核心模組
+├── punch_clock/       # 打卡服務模組（包含視覺化測試）
 └── scheduler.py       # 排程管理（待開發）
 
 docs/
@@ -205,7 +205,7 @@ main.py               # 統一主程式入口點（整合所有功能）
 - **src/punch_clock/**: 模組化打卡服務，包含 `PunchClockService` 主要服務接口，實現網站自動化邏輯和截圖功能
 - **src/config.py**: 使用 Pydantic 和環境變數進行配置驗證和管理
 - **src/models/**: 分離式資料模型架構，包含核心、配置、測試相關模型
-- **src/visual_test.py**: 視覺化測試執行器，支援截圖、報告生成、互動模式
+- **src/punch_clock/service.py**: 打卡服務主接口，包含視覺化測試、截圖、報告生成功能
 - **main.py**: 統一程式入口點，整合所有功能（基本打卡、視覺化測試、排程器）
 
 #### 統一入口架構設計

@@ -29,7 +29,7 @@
 - [✅] 實現打卡頁面導航和打卡功能邏輯 (簽到/簽退模擬)
 - [✅] 建立配置管理系統 (config.py)
 - [✅] 建立資料模型系統 (models.py)
-- [✅] 實現視覺化測試系統 (visual_test.py)
+- [✅] 實現視覺化測試系統 (整合到 PunchClockService)
 - [✅] 建立主程式與測試工具分離架構
 - [⏳] 實現排程系統 (APScheduler)
 - [⏳] 增強錯誤處理和重試機制
@@ -88,7 +88,7 @@
 - [✅] 基礎自動化框架建立
 - [✅] 配置系統完成 (ConfigManager類別)
 - [✅] 資料模型定義 (models.py，包含視覺化測試模型)
-- [✅] 視覺化測試系統 (VisualTestRunner類別)
+- [✅] 視覺化測試系統 (整合到 PunchClockService)
 - [✅] 自動截圖和錯誤診斷功能
 - [✅] HTML測試報告生成
 - [✅] 主程式與測試工具分離架構
@@ -122,7 +122,7 @@
 - ✅ `src/punch_clock/` - 模組化打卡服務 (PunchClockService主要服務接口)
 - ✅ `src/config.py` - 配置管理 (ConfigManager類別with Pydantic)
 - ✅ `src/models.py` - 資料模型定義（包含視覺化測試模型）
-- ✅ `src/visual_test.py` - 視覺化測試核心模組
+- ✅ `src/punch_clock/service.py` - 打卡服務（包含視覺化測試功能）
 - ✅ `src/__init__.py` - 模組初始化
 - ✅ `main.py` - 純粹的主程式入口（僅基本登入測試）
 - ✅ `main_visual.py` - 專門的視覺化測試工具
@@ -152,7 +152,7 @@
 │   ├── punch_clock.py             # 自動化邏輯（含截圖功能）
 │   ├── config.py                  # 配置管理
 │   ├── models.py                  # 資料模型（含視覺化測試模型）
-│   └── visual_test.py             # 視覺化測試核心
+│   └── punch_clock/               # 打卡服務模組（包含視覺化測試）
 ├── main.py                        # 純粹主程式入口
 ├── main_visual.py                 # 專門視覺化測試工具
 ├── config.example.json            # 範例配置
@@ -189,7 +189,7 @@
 - 程式分離架構：主程式與測試工具完全分離
 
 **技術實現:**
-- `src/visual_test.py`: VisualTestRunner 類別
+- `src/punch_clock/service.py`: PunchClockService 類別（包含視覺化測試功能）
 - `main_visual.py`: 專門的測試工具入口
 - 支援多種輸出格式：JSON、HTML
 - 完整的命令行參數系統

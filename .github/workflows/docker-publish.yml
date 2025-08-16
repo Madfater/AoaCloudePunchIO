@@ -93,8 +93,8 @@ jobs:
         uv run python -c "
         import sys
         sys.path.insert(0, 'src')
-        from visual_test import VisualTestRunner
-        from models.testing import VisualTestConfig
+        from punch_clock import PunchClockService
+        from models.testing import VisualTestResult, TestStep, ScreenshotInfo
         print('✅ 視覺化測試模組正常')
         "
         

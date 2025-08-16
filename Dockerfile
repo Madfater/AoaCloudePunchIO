@@ -111,8 +111,20 @@ RUN chmod +x /app/check_permissions.sh
 # 從建構階段複製虛擬環境並設定正確的擁有者
 COPY --from=builder --chown=appuser:appuser /app/.venv /app/.venv
 
-# 安裝 Playwright 系統依賴（作為 root）
-RUN /root/.local/bin/uv run playwright install-deps chromium
+# 安裝 Playwright 系統依賴（作為 root，直接安裝）
+# 這些是 Chromium 瀏覽器運行所需的系統套件
+RUN apt-get update && apt-get install -y \
+    # Chromium 額外依賴
+    libnss3-dev \
+    libxss1 \
+    libasound2-dev \
+    libgtk-3-dev \
+    libdrm2 \
+    libxcomposite1 \
+    libxdamage1 \
+    libxrandr2 \
+    libgbm1 \
+    && rm -rf /var/lib/apt/lists/*
 
 # 建立必要的目錄並設定權限
 RUN mkdir -p /app/screenshots /app/logs && \
@@ -125,9 +137,10 @@ USER appuser
 
 # 為 appuser 安裝 UV
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh
-ENV PATH="/home/appuser/.local/bin:$PATH"
+ENV PATH="/home/appuser/.local/bin:/app/.venv/bin:$PATH"
 
 # 作為 appuser 安裝 Playwright 瀏覽器
+WORKDIR /app
 RUN uv run playwright install chromium
 
 

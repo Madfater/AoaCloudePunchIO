@@ -202,13 +202,14 @@ async def punch_callback(action: PunchAction) -> PunchResult:
         config = config_manager.load_config()
         credentials = config_manager.get_login_credentials()
         
-        # 創建打卡服務（排程模式不使用交互式確認）
+        # 創建打卡服務（排程模式直接執行真實打卡）
         service = PunchClockService(
             headless=True,
             enable_screenshots=True,
             gps_config=config.gps,
             webhook_config=config.webhook,
-            interactive_mode=False
+            interactive_mode=False,
+            scheduler_mode=True  # 啟用排程器模式，直接執行真實打卡
         )
         
         # 執行真實打卡操作

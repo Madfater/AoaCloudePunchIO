@@ -25,12 +25,14 @@ class PunchClockService:
     
     def __init__(self, headless: bool = True, enable_screenshots: bool = False, 
                  screenshots_dir: str = "screenshots", gps_config: Optional[GPSConfig] = None,
-                 interactive_mode: bool = False, webhook_config: Optional[WebhookConfig] = None):
+                 interactive_mode: bool = False, webhook_config: Optional[WebhookConfig] = None,
+                 scheduler_mode: bool = False):
         self.headless = headless
         self.enable_screenshots = enable_screenshots
         self.screenshots_dir = screenshots_dir
         self.gps_config = gps_config or GPSConfig()
         self.interactive_mode = interactive_mode
+        self.scheduler_mode = scheduler_mode  # 排程器模式，自動確認真實打卡
         
         # Webhook 管理器
         self.webhook_manager: Optional[WebhookManager] = None
@@ -206,8 +208,14 @@ class PunchClockService:
         self.punch_executor.set_interactive_mode(self.interactive_mode)
         
         if real_punch:
-            # 等待用戶確認
-            confirm = await self.punch_executor.wait_for_punch_confirmation(action)
+            # 根據模式決定是否需要用戶確認
+            if self.scheduler_mode:
+                # 排程器模式：直接執行真實打卡（用於Docker環境）
+                logger.info("🤖 排程器模式：直接執行真實打卡操作")
+                confirm = True
+            else:
+                # 手動模式：等待用戶確認
+                confirm = await self.punch_executor.wait_for_punch_confirmation(action)
             result = await self.punch_executor.execute_punch_action(action, True, confirm)
         else:
             # 模擬模式
